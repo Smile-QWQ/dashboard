@@ -1,23 +1,19 @@
-name: build and push
+name: Build and Release Static Files
+
 on:
   push:
     branches:
-      - "feature/**"
       - main
-    tags:
-      - "**"
-  pull_request:
-
-env:
-  IMAGE_NAME: netbirdio/dashboard
+  workflow_dispatch:
 
 jobs:
-  build_n_push:
+  build_and_release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: setup-node
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
@@ -26,7 +22,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - run: echo '{}' > .local-config.json
+      - name: Create empty local config
+        run: echo '{}' > .local-config.json
 
       - name: Download IronRDP release TS files
         uses: robinraju/release-downloader@v1.7
@@ -55,33 +52,21 @@ jobs:
           fileName: "ironrdp_web_bg.wasm"
           out-file-path: 'public/ironrdp-pkg'
 
-      - name: Build
+      - name: Build static files
         run: npm run build
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      -
-        name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v4
+
+      - name: Archive static files
+        run: tar -czvf dashboard-static.tar.gz -C out .
+
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v1
         with:
-          images: ${{ env.IMAGE_NAME }}
-      -
-        name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.NB_DOCKER_USER }}
-          password: ${{ secrets.NB_DOCKER_TOKEN }}
-      -
-        name: Docker build and push
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: docker/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64,linux/arm
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          files: dashboard-static.tar.gz
+          name: "Dashboard Nightly Build - ${{ github.run_id }}"
+          tag_name: nightly-${{ github.run_id }}
+          body: |
+            Automated build of Netbird Dashboard static files.
+            Triggered by commit: `${{ github.sha }}`
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
