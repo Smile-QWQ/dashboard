@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build_and_release:
     runs-on: ubuntu-latest
@@ -55,6 +58,16 @@ jobs:
       - name: Build static files
         run: npm run build
 
+      - name: Prepare artifacts
+        run: |
+          mkdir -p out
+          if [ -d "docker" ]; then
+            cp docker/*.tmpl out/ 2>/dev/null || true
+            cp docker/*.conf out/ 2>/dev/null || true
+            cp docker/init_react_envs.sh out/ 2>/dev/null || true
+          fi
+          cp OIDC_TRUSTED_DOMAINS.js.tmpl out/ 2>/dev/null || true
+
       - name: Archive static files
         run: tar -czvf dashboard-static.tar.gz -C out .
 
@@ -62,11 +75,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: dashboard-static.tar.gz
-          name: "Dashboard Nightly Build - ${{ github.run_id }}"
-          tag_name: nightly-${{ github.run_id }}
-          body: |
-            Automated build of Netbird Dashboard static files.
-            Triggered by commit: `${{ github.sha }}`
-          prerelease: true
+          name: "Dashboard Build ${{ github.run_id }}"
+          tag_name: build-${{ github.run_id }}
+          body: Automated build of Netbird Dashboard static files.
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
