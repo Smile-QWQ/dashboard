@@ -9,14 +9,14 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import { Viewport } from "next";
 import localFont from "next/font/local";
 import React, { Suspense } from "react";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "sonner";
 import OIDCProvider from "@/auth/OIDCProvider";
 import FullScreenLoading from "@/components/ui/FullScreenLoading";
-import AnalyticsProvider, {
-} from "@/contexts/AnalyticsProvider";
+import AnalyticsProvider, { GoogleTagManagerHeadScript } from "@/contexts/AnalyticsProvider";
 import DialogProvider from "@/contexts/DialogProvider";
 import ErrorBoundaryProvider from "@/contexts/ErrorBoundary";
 import { GlobalThemeProvider } from "@/contexts/GlobalThemeProvider";
+import InstanceSetupProvider from "@/contexts/InstanceSetupProvider";
 import { NavigationEvents } from "@/contexts/NavigationEvents";
 import RuntimeConfigProvider from "@/contexts/RuntimeConfigProvider";
 
@@ -25,7 +25,6 @@ const inter = localFont({
   display: "swap",
 });
 
-// Extend dayjs with relativeTime plugin
 dayjs.extend(relativeTime);
 
 export const viewport: Viewport = {
@@ -38,26 +37,33 @@ export default function AppLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={cn(inter.className, "dark:bg-nb-gray bg-gray-50")}>
+      <head />
+      <body className={cn(inter.className)}>
         <RuntimeConfigProvider>
+          <GoogleTagManagerHeadScript />
           <Suspense fallback={<FullScreenLoading />}>
             <AnalyticsProvider>
               <DialogProvider>
                 <GlobalThemeProvider>
                   <ErrorBoundaryProvider>
-                    <OIDCProvider>
-                      <TooltipProvider delayDuration={0}>
-                        {children}
-                      </TooltipProvider>
-                    </OIDCProvider>
+                    <InstanceSetupProvider>
+                      <OIDCProvider>
+                        <TooltipProvider delayDuration={0}>
+                          {children}
+                        </TooltipProvider>
+                      </OIDCProvider>
+                    </InstanceSetupProvider>
                   </ErrorBoundaryProvider>
                 </GlobalThemeProvider>
               </DialogProvider>
               <Toaster
-                position={"top-center"}
-                toastOptions={{
-                  duration: 3000,
-                }}
+                position="top-center"
+                duration={3000}
+                toastOptions={{ unstyled: true }}
+                style={{ "--width": "28rem" } as React.CSSProperties}
+                gap={0}
+                visibleToasts={5}
+                offset="12px"
               />
               <NavigationEvents />
               <DisableDarkReader />

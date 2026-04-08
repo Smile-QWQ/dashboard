@@ -30,6 +30,7 @@ import {
   MonitorSmartphoneIcon,
   NetworkIcon,
   SearchIcon,
+  ShieldCheck,
   WorkflowIcon,
 } from "lucide-react";
 import * as React from "react";
@@ -40,10 +41,13 @@ import { useElementSize } from "@/hooks/useElementSize";
 import type { Group, GroupPeer, GroupResource } from "@/interfaces/Group";
 import { NetworkResource } from "@/interfaces/Network";
 import type { Peer } from "@/interfaces/Peer";
-import { PolicyRuleResource } from "@/interfaces/Policy";
+import { Policy, PolicyRuleResource } from "@/interfaces/Policy";
 import { User } from "@/interfaces/User";
-import { PeerOperatingSystemIcon } from "@/modules/peers/PeerOperatingSystemIcon";
 import { HorizontalUsersStack } from "@/modules/users/HorizontalUsersStack";
+import { PeerOperatingSystemIcon } from "@/modules/peers/PeerOperatingSystemIcon";
+import TruncatedText from "@components/ui/TruncatedText";
+
+type PeerGroupSelectorTab = "peers" | "groups" | "resources";
 
 const groupsSearchPredicate = (item: Group, query: string) => {
   const lowerCaseQuery = query.toLowerCase();
@@ -68,14 +72,21 @@ interface MultiSelectProps {
   showResourceCounter?: boolean;
   showResources?: boolean;
   showPeers?: boolean;
+  showPeerCounter?: boolean;
+  hideGroupsTab?: boolean;
+  tabOrder?: ("groups" | "peers" | "resources")[];
+  closeOnSelect?: boolean;
   resource?: PolicyRuleResource;
   onResourceChange?: (resource?: PolicyRuleResource) => void;
-  placeholder?: string;
+  placeholder?: React.ReactNode | string;
   customTrigger?: React.ReactNode;
   align?: "start" | "end";
   side?: "top" | "bottom";
   users?: User[];
   placeholderForSearch?: string;
+  resourceIds?: string[];
+  additionalResources?: NetworkResource[];
+  policies?: Policy[];
 }
 export function PeerGroupSelector({
   onChange,
@@ -94,6 +105,10 @@ export function PeerGroupSelector({
   showResourceCounter = true,
   showResources = false,
   showPeers = false,
+  showPeerCounter = true,
+  hideGroupsTab = false,
+  tabOrder,
+  closeOnSelect = false,
   resource,
   onResourceChange,
   placeholder = "Add or select group(s)...",
@@ -102,10 +117,21 @@ export function PeerGroupSelector({
   side = "bottom",
   users,
   placeholderForSearch = 'Search groups or add new group by pressing "Enter"...',
+  resourceIds,
+  additionalResources,
+  policies,
 }: Readonly<MultiSelectProps>) {
-  const { data: resources, isLoading: isResourcesLoading } = useFetchApi<
+  const { data: fetchedResources, isLoading: isResourcesLoading } = useFetchApi<
     NetworkResource[]
   >("/networks/resources");
+
+  const resources = useMemo(() => {
+    if (!additionalResources?.length) return fetchedResources;
+    const additional = additionalResources.filter(
+      (ar) => !fetchedResources?.some((r) => r.id === ar.id),
+    );
+    return [...(fetchedResources || []), ...additional];
+  }, [fetchedResources, additionalResources]);
 
   const { data: peers, isLoading: isPeersLoading } =
     useFetchApi<Peer[]>("/peers");
@@ -229,7 +255,13 @@ export function PeerGroupSelector({
 
   const [slice, setSlice] = useState(10);
 
-  const [tab, setTab] = useState("groups");
+  const getDefaultTab = (): PeerGroupSelectorTab => {
+    if (tabOrder?.[0]) return tabOrder[0];
+    if (hideGroupsTab) return showPeers ? "peers" : "resources";
+    return "groups";
+  };
+
+  const [tab, setTab] = useState<PeerGroupSelectorTab>(getDefaultTab);
 
   useEffect(() => {
     if (open) {
@@ -272,6 +304,9 @@ export function PeerGroupSelector({
         : undefined,
     );
     onChange([]);
+    if (closeOnSelect) {
+      setOpen(false);
+    }
   };
 
   const selectPeer = (peer?: Peer) => {
@@ -281,6 +316,9 @@ export function PeerGroupSelector({
       type: "peer",
     });
     onChange([]);
+    if (closeOnSelect) {
+      setOpen(false);
+    }
   };
 
   return (
@@ -306,7 +344,7 @@ export function PeerGroupSelector({
               "min-h-[46px] w-full relative items-center group",
               "border border-neutral-200 dark:border-nb-gray-700 justify-between py-2 px-3",
               "rounded-md bg-white text-sm dark:bg-nb-gray-900/40 flex dark:text-neutral-400/70 text-neutral-500 cursor-pointer hover:dark:bg-nb-gray-900/50",
-              "disabled:pointer-events-none disabled:opacity-30 transition-all",
+              "disabled:pointer-events-none disabled:opacity-60 transition-all",
             )}
             disabled={disabled}
             data-cy={dataCy}
@@ -320,7 +358,14 @@ export function PeerGroupSelector({
               {resource && (
                 <ResourceBadge
                   className={"py-[3px]"}
-                  resource={resources?.find((r) => r.id === resource.id)}
+                  resource={
+                    resources?.find((r) => r.id === resource.id) ??
+                    ({
+                      id: resource.id,
+                      name: resource.id,
+                      type: resource.type,
+                    } as NetworkResource)
+                  }
                   peer={peers?.find((p) => p.id === resource.id)}
                   onClick={(e) => {
                     e.preventDefault();
@@ -374,7 +419,9 @@ export function PeerGroupSelector({
               })}
 
               {values.length == 0 && !resource && (
-                <span className={"pl-1"}>{placeholder}</span>
+                <span className={cn(typeof placeholder === "string" && "pl-1")}>
+                  {placeholder}
+                </span>
               )}
             </div>
 
@@ -438,11 +485,20 @@ export function PeerGroupSelector({
               </div>
             </div>
 
-            <Tabs defaultValue={"groups"} value={tab} onValueChange={setTab}>
+            <Tabs
+              defaultValue={
+                tabOrder?.[0] ??
+                (hideGroupsTab ? (showPeers ? "peers" : "resources") : "groups")
+              }
+              value={tab}
+              onValueChange={(v) => setTab(v as PeerGroupSelectorTab)}
+            >
               <TabTriggers
                 searchRef={searchRef}
                 showPeers={showPeers}
                 showResources={showResources}
+                hideGroupsTab={hideGroupsTab}
+                tabOrder={tabOrder}
               />
               <TabsContent value={"groups"} className={"p-0 my-0"}>
                 <CommandGroup>
@@ -526,7 +582,7 @@ export function PeerGroupSelector({
                               />
                             </div>
 
-                            <div className={"flex items-center gap-5"}>
+                            <div className={"flex items-center gap-4"}>
                               {option?.id && showRoutes && (
                                 <AccessControlGroupCount group_id={option.id} />
                               )}
@@ -535,19 +591,21 @@ export function PeerGroupSelector({
                                 <ResourcesCounter group={option} />
                               )}
 
-                              <div className={"flex gap-3 items-center"}>
+                              {policies && (
+                                <PolicyCounter
+                                  group={option}
+                                  policies={policies}
+                                />
+                              )}
+
+                              <div className={"flex gap-4 items-center"}>
                                 {!users ? (
-                                  <div
-                                    className={
-                                      "text-neutral-500 dark:text-nb-gray-300 font-medium flex items-center gap-2"
-                                    }
-                                  >
-                                    <MonitorSmartphoneIcon
-                                      size={14}
-                                      className={"shrink-0"}
+                                  showPeerCounter && (
+                                    <PeerCounter
+                                      group={option}
+                                      showResourceCounter={showResourceCounter}
                                     />
-                                    {peerCount} Peer(s)
-                                  </div>
+                                  )
                                 ) : (
                                   <UsersCounter
                                     group={option}
@@ -555,7 +613,6 @@ export function PeerGroupSelector({
                                     selected={isSelected}
                                   />
                                 )}
-
                                 <Checkbox checked={isSelected} />
                               </div>
                             </div>
@@ -570,7 +627,11 @@ export function PeerGroupSelector({
                 <TabsContent value={"resources"} className={"p-0 my-0"}>
                   <ResourcesList
                     search={search}
-                    resources={resources}
+                    resources={
+                      resourceIds
+                        ? resources?.filter((r) => resourceIds.includes(r.id))
+                        : resources
+                    }
                     isLoading={isResourcesLoading}
                     value={resource}
                     onChange={selectResource}
@@ -600,60 +661,89 @@ const TabTriggers = ({
   searchRef,
   showResources = false,
   showPeers = false,
+  hideGroupsTab = false,
+  tabOrder,
 }: {
   searchRef: React.MutableRefObject<HTMLInputElement | null>;
   showResources?: boolean;
   showPeers?: boolean;
+  hideGroupsTab?: boolean;
+  tabOrder?: ("groups" | "peers" | "resources")[];
 }) => {
-  if (!showResources && !showPeers) return null;
+  const tabCount =
+    (!hideGroupsTab ? 1 : 0) + (showResources ? 1 : 0) + (showPeers ? 1 : 0);
+  if (tabCount <= 1) return null;
+
+  const groupsTab = !hideGroupsTab && (
+    <TabsTrigger
+      key="groups"
+      value={"groups"}
+      className={"text-[.8rem] font-normal"}
+      onClick={() => searchRef.current?.focus()}
+    >
+      <FolderGit2
+        className={
+          "text-nb-gray-500 group-data-[state=active]/trigger:text-netbird transition-all"
+        }
+        size={14}
+      />
+      Groups
+    </TabsTrigger>
+  );
+
+  const resourcesTab = showResources && (
+    <TabsTrigger
+      key="resources"
+      value={"resources"}
+      className={"text-[.8rem] font-normal"}
+      onClick={() => searchRef.current?.focus()}
+    >
+      <Layers3Icon
+        className={
+          "text-nb-gray-500 group-data-[state=active]/trigger:text-netbird transition-all"
+        }
+        size={14}
+      />
+      Resources
+    </TabsTrigger>
+  );
+
+  const peersTab = showPeers && (
+    <TabsTrigger
+      key="peers"
+      value={"peers"}
+      className={"text-[.8rem] font-normal"}
+      onClick={() => searchRef.current?.focus()}
+    >
+      <MonitorSmartphoneIcon
+        className={
+          "text-nb-gray-500 group-data-[state=active]/trigger:text-netbird transition-all"
+        }
+        size={14}
+      />
+      Peers
+    </TabsTrigger>
+  );
+
+  const tabMap = {
+    groups: groupsTab,
+    peers: peersTab,
+    resources: resourcesTab,
+  };
+
+  if (tabOrder) {
+    return (
+      <TabsList justify={"start"} className={"px-3"}>
+        {tabOrder.map((tab) => tabMap[tab])}
+      </TabsList>
+    );
+  }
 
   return (
     <TabsList justify={"start"} className={"px-3"}>
-      <TabsTrigger
-        value={"groups"}
-        className={"text-[.8rem] font-normal"}
-        onClick={() => searchRef.current?.focus()}
-      >
-        <FolderGit2
-          className={
-            "text-nb-gray-500 group-data-[state=active]/trigger:text-netbird transition-all"
-          }
-          size={14}
-        />
-        Groups
-      </TabsTrigger>
-
-      {showResources && (
-        <TabsTrigger
-          value={"resources"}
-          className={"text-[.8rem] font-normal"}
-          onClick={() => searchRef.current?.focus()}
-        >
-          <Layers3Icon
-            className={
-              "text-nb-gray-500 group-data-[state=active]/trigger:text-netbird transition-all"
-            }
-            size={14}
-          />
-          Resources
-        </TabsTrigger>
-      )}
-
-      {showPeers && (
-        <TabsTrigger
-          value={"peers"}
-          className={"text-[.8rem] font-normal"}
-          onClick={() => searchRef.current?.focus()}
-        >
-          <MonitorSmartphoneIcon
-            className={
-              "text-nb-gray-500 group-data-[state=active]/trigger:text-netbird transition-all"
-            }
-            size={14}
-          />
-          Peers
-        </TabsTrigger>
-      )}
+      {groupsTab}
+      {resourcesTab}
+      {peersTab}
     </TabsList>
   );
 };
@@ -671,7 +761,14 @@ const UsersCounter = ({
     users?.filter((user) => user.auto_groups.includes(group.id as string)) ||
     [];
 
-  if (usersOfGroup.length === 0) return null;
+  if (usersOfGroup.length === 0)
+    return (
+      <span
+        className={"group-hover/user-stack:text-nb-gray-200 text-nb-gray-300"}
+      >
+        0 User(s)
+      </span>
+    );
 
   return (
     <HorizontalUsersStack
@@ -686,6 +783,31 @@ const UsersCounter = ({
   );
 };
 
+const PeerCounter = ({
+  group,
+  showResourceCounter,
+}: {
+  group: Group;
+  showResourceCounter?: boolean;
+}) => {
+  const peerCount = group.peers?.length ?? group?.peers_count ?? 0;
+  const resourcesCount = group?.resources_count ?? 0;
+  const hidePeerCounter =
+    showResourceCounter && peerCount === 0 && resourcesCount > 0;
+
+  return (
+    <div
+      className={cn(
+        "text-neutral-500 dark:text-nb-gray-300 font-medium flex items-center gap-2",
+        hidePeerCounter && "hidden",
+      )}
+    >
+      <MonitorSmartphoneIcon size={14} className={"shrink-0"} />
+      {peerCount} Peer(s)
+    </div>
+  );
+};
+
 const ResourcesCounter = ({ group }: { group: Group }) => {
   return group?.resources_count && group.resources_count > 0 ? (
     <div
@@ -697,6 +819,39 @@ const ResourcesCounter = ({ group }: { group: Group }) => {
       {group.resources_count} Resource(s)
     </div>
   ) : null;
+};
+
+const PolicyCounter = ({
+  group,
+  policies,
+}: {
+  group: Group;
+  policies: Policy[];
+}) => {
+  const count = useMemo(() => {
+    if (!group.id) return 0;
+    return policies.filter((policy) => {
+      const destinations = policy.rules?.[0]?.destinations as
+        | (Group | string)[]
+        | undefined;
+      return destinations?.some((d) =>
+        typeof d === "string" ? d === group.id : d.id === group.id,
+      );
+    }).length;
+  }, [group.id, policies]);
+
+  if (count === 0) return null;
+
+  return (
+    <div
+      className={
+        "text-nb-gray-300 font-medium flex items-center gap-2 transition-all"
+      }
+    >
+      <ShieldCheck size={14} className={"shrink-0"} />
+      {count} {count === 1 ? "Policy" : "Policies"}
+    </div>
+  );
 };
 
 const resourcesSearchPredicate = (item: NetworkResource, query: string) => {
@@ -763,6 +918,7 @@ const ResourcesList = ({
       <VirtualScrollAreaList
         items={filteredItems}
         onSelect={onChange}
+        estimatedItemHeight={42}
         itemClassName={"dark:aria-selected:bg-nb-gray-800/20"}
         renderItem={(res) => {
           return (
@@ -872,6 +1028,7 @@ const PeersList = ({
       <VirtualScrollAreaList
         items={filteredItems}
         onSelect={onChange}
+        estimatedItemHeight={42}
         itemClassName={"dark:aria-selected:bg-nb-gray-800/20"}
         renderItem={(res) => {
           if (!res?.id) return;
@@ -880,7 +1037,7 @@ const PeersList = ({
             <Fragment key={res.id}>
               <div className={"flex items-center gap-2"}>
                 <Badge
-                  useHover={true}
+                  useHover={false}
                   data-cy={"group-badge"}
                   variant={"gray-ghost"}
                   className={cn(
@@ -891,7 +1048,7 @@ const PeersList = ({
                   }}
                 >
                   <PeerOperatingSystemIcon os={res.os} />
-                  <TextWithTooltip text={res?.name || ""} maxChars={20} />
+                  <TruncatedText text={res?.name || ""} maxWidth={"270px"} />
                 </Badge>
               </div>
 

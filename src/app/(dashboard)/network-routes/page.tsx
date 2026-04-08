@@ -1,7 +1,6 @@
 "use client";
 
 import Breadcrumbs from "@components/Breadcrumbs";
-import { Callout } from "@components/Callout";
 import InlineLink from "@components/InlineLink";
 import Paragraph from "@components/Paragraph";
 import SkeletonTable from "@components/skeletons/SkeletonTable";
@@ -17,6 +16,7 @@ import RoutesProvider from "@/contexts/RoutesProvider";
 import { Route } from "@/interfaces/Route";
 import PageContainer from "@/layouts/PageContainer";
 import useGroupedRoutes from "@/modules/route-group/useGroupedRoutes";
+import { Callout } from "@components/Callout";
 
 const NetworkRoutesTable = lazy(
   () => import("@/modules/route-group/NetworkRoutesTable"),
@@ -61,7 +61,7 @@ export default function NetworkRoutes() {
               in our documentation.
             </Paragraph>
 
-            <Callout className={"max-w-xl mt-3"} variant={"warning"}>
+            <Callout className={"max-w-xl mt-5"} variant={"warning"}>
               <span>
                 We recommend using the new Networks concept to easier visualise
                 and manage access to your resources.{" "}

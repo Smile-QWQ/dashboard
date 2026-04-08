@@ -1,19 +1,21 @@
 import Badge from "@components/Badge";
-import { ScrollArea } from "@components/ScrollArea";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@components/Tooltip";
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@components/HoverCard";
+import { ScrollArea } from "@components/ScrollArea";
 import GroupBadge from "@components/ui/GroupBadge";
-import PeerBadge from "@components/ui/PeerBadge";
+import PeerCountBadge from "@components/ui/PeerCountBadge";
+import ResourceCountBadge from "@components/ui/ResourceCountBadge";
 import { cn } from "@utils/helpers";
 import { ArrowRightIcon, PencilLineIcon } from "lucide-react";
 import * as React from "react";
 import { usePermissions } from "@/contexts/PermissionsProvider";
+import { useUsers } from "@/contexts/UsersProvider";
 import { Group } from "@/interfaces/Group";
 import EmptyRow from "@/modules/common-table-rows/EmptyRow";
+import { HorizontalUsersStack } from "@/modules/users/HorizontalUsersStack";
 
 type Props = {
   groups: Group[];
@@ -21,6 +23,10 @@ type Props = {
   description?: string;
   onClick?: () => void;
   className?: string;
+  showResources?: boolean;
+  redirectGroupTab?: string;
+  showUsers?: boolean;
+  disableRedirect?: boolean;
 };
 
 export default function MultipleGroups({
@@ -29,6 +35,10 @@ export default function MultipleGroups({
   description = "Use groups to control what this peer can access",
   onClick,
   className,
+  showResources = false,
+  showUsers = false,
+  redirectGroupTab,
+  disableRedirect = false,
 }: Readonly<Props>) {
   const { permission } = usePermissions();
 
@@ -45,13 +55,9 @@ export default function MultipleGroups({
   const otherGroups = orderedGroups.length > 0 ? orderedGroups.slice(1) : [];
 
   return (
-    <TooltipProvider
-      disableHoverableContent={false}
-      delayDuration={200}
-      skipDelayDuration={200}
-    >
-      <Tooltip>
-        <TooltipTrigger asChild={true}>
+    <div className={"flex"}>
+      <HoverCard openDelay={200} closeDelay={100}>
+        <HoverCardTrigger>
           <div
             className={cn("inline-flex items-center gap-2 z-0", className)}
             data-cy={"multiple-groups"}
@@ -60,6 +66,7 @@ export default function MultipleGroups({
             {firstGroup && (
               <GroupBadge
                 group={firstGroup}
+                showNewBadge={true}
                 className={
                   permission.groups.update ? "group-hover:bg-nb-gray-800" : ""
                 }
@@ -78,9 +85,9 @@ export default function MultipleGroups({
               </Badge>
             )}
           </div>
-        </TooltipTrigger>
+        </HoverCardTrigger>
         {orderedGroups && orderedGroups.length > 0 && (
-          <TooltipContent
+          <HoverCardContent
             className={"p-0"}
             onClick={(e) => e.stopPropagation()}
           >
@@ -97,24 +104,43 @@ export default function MultipleGroups({
                   return (
                     group && (
                       <div
-                        key={group.id}
+                        key={group?.id || group?.name}
                         className={
                           "flex gap-2 items-center justify-between w-full"
                         }
                       >
-                        <GroupBadge group={group}></GroupBadge>
+                        <GroupBadge
+                          group={group}
+                          className={"py-0"}
+                          textClassName={"py-1.5"}
+                          showNewBadge={true}
+                          redirectToGroupPage={!disableRedirect}
+                          redirectGroupTab={redirectGroupTab}
+                        ></GroupBadge>
                         <ArrowRightIcon size={14} />
-                        <PeerBadge> {group.peers_count} Peer(s)</PeerBadge>
+                        {showResources ? (
+                          <ResourceCountBadge
+                            group={group}
+                            disableRedirect={disableRedirect}
+                          />
+                        ) : showUsers ? (
+                          <UserCountStack group={group} />
+                        ) : (
+                          <PeerCountBadge
+                            group={group}
+                            disableRedirect={disableRedirect}
+                          />
+                        )}
                       </div>
                     )
                   );
                 })}
               </div>
             </ScrollArea>
-          </TooltipContent>
+          </HoverCardContent>
         )}
-      </Tooltip>
-    </TooltipProvider>
+      </HoverCard>
+    </div>
   );
 }
 
@@ -127,5 +153,19 @@ export const TransparentEditIconButton = () => {
     >
       <PencilLineIcon size={16} />
     </div>
+  );
+};
+
+export const UserCountStack = ({ group }: { group: Group }) => {
+  const { users } = useUsers();
+  const usersOfGroup =
+    users?.filter((user) => user.auto_groups.includes(group.id as string)) ||
+    [];
+  return (
+    <HorizontalUsersStack
+      users={usersOfGroup}
+      side={"right"}
+      isAllGroup={group?.name === "All"}
+    />
   );
 };

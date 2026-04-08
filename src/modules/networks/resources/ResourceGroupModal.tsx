@@ -8,13 +8,13 @@ import {
 import ModalHeader from "@components/modal/ModalHeader";
 import { notify } from "@components/Notification";
 import { PeerGroupSelector } from "@components/PeerGroupSelector";
-import Separator from "@components/Separator";
 import { useApiCall } from "@utils/api";
-import { FolderGit2 } from "lucide-react";
 import * as React from "react";
-import { useMemo } from "react";
 import { Network, NetworkResource } from "@/interfaces/Network";
 import useGroupHelper from "@/modules/groups/useGroupHelper";
+import { useNetworksContext } from "@/modules/networks/NetworkProvider";
+import { FolderGit2 } from "lucide-react";
+import Separator from "@components/Separator";
 
 type ResourceGroupModalProps = {
   resource?: NetworkResource;
@@ -59,6 +59,7 @@ const ResourceGroupModalContent = ({
     `/networks/${network?.id}/resources/${resource?.id}`,
   ).put;
 
+  const { policies } = useNetworksContext();
   const [groups, setGroups, { save: saveGroups }] = useGroupHelper({
     initial: resource?.groups || [],
   });
@@ -78,26 +79,27 @@ const ResourceGroupModalContent = ({
     });
   };
 
-  const canSave = useMemo(() => {
-    return groups.length > 0;
-  }, [groups]);
-
   return (
-    <ModalContent maxWidthClass={"max-w-xl"}>
+    <ModalContent maxWidthClass={"max-w-2xl"}>
       <ModalHeader
-        icon={<FolderGit2 size={18} />}
-        title={"Assigned Groups"}
+        title={"Resource Groups"}
         description={
-          "Add this resource to groups and use them as destinations when creating policies"
+          "Add this resource to a group (e.g., Databases, Web Servers) and reference the group in access policies to simplify management."
         }
-        color={"blue"}
+        icon={<FolderGit2 size={18} />}
       />
 
       <Separator />
 
-      <div className={"px-8 py-6 flex flex-col gap-8"}>
+      <div className={"px-8 py-6 pt-6 flex flex-col gap-8"}>
         <div>
-          <PeerGroupSelector onChange={setGroups} values={groups} />
+          <PeerGroupSelector
+            onChange={setGroups}
+            values={groups}
+            showPeerCounter={false}
+            placeholder={"Add or select resource group(s)..."}
+            policies={policies}
+          />
         </div>
       </div>
 
@@ -107,11 +109,7 @@ const ResourceGroupModalContent = ({
             <Button variant={"secondary"}>Cancel</Button>
           </ModalClose>
 
-          <Button
-            variant={"primary"}
-            onClick={updateResource}
-            disabled={!canSave}
-          >
+          <Button variant={"primary"} onClick={updateResource}>
             Save Groups
           </Button>
         </div>

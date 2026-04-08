@@ -27,6 +27,8 @@ type DialogOptions = {
   type?: "default" | "warning" | "danger" | "center";
   children?: React.ReactNode;
   maxWidthClass?: string;
+  hideIcon?: boolean;
+  center?: boolean;
 };
 
 export default function DialogProvider({ children }: Props) {
@@ -34,7 +36,7 @@ export default function DialogProvider({ children }: Props) {
     isOpen: false,
   });
   const [dialogOptions, setDialogOptions] = useState<DialogOptions>();
-  const fn = useRef<Function>();
+  const fn = useRef<Function>(undefined);
 
   const confirm = useCallback((data: DialogOptions): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -66,16 +68,18 @@ export default function DialogProvider({ children }: Props) {
           <ModalContent
             maxWidthClass={dialogOptions.maxWidthClass || "max-w-[400px]"}
             showClose={false}
+            onInteractOutside={(e) => e.preventDefault()}
+            onPointerDownOutside={(e) => e.preventDefault()}
           >
             <ModalHeader
-              center={dialogOptions.type == "center"}
+              center={dialogOptions.center ?? dialogOptions.type == "center"}
               title={dialogOptions.title || "Confirmation"}
               margin={"mt-1"}
               description={
                 dialogOptions.description ||
                 "Are you sure you want to continue? This action cannot be undone."
               }
-              icon={dialogTypes[dialogOptions.type || "default"]}
+              icon={dialogOptions.hideIcon ? "" : dialogTypes[dialogOptions.type || "default"]}
               color={
                 dialogOptions.type == "default"
                   ? "blue"

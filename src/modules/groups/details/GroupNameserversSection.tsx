@@ -1,24 +1,27 @@
-import { usePortalElement } from "@hooks/usePortalElement";
 import React, { lazy } from "react";
 import { useGroupContext } from "@/contexts/GroupProvider";
 import { NameserverGroup } from "@/interfaces/Nameserver";
 import { GroupDetailsTableContainer } from "@/modules/groups/details/GroupDetailsTableContainer";
 
 const NameserverGroupTable = lazy(
-  () => import("@/modules/dns-nameservers/table/NameserverGroupTable"),
+  () => import("@/modules/dns/nameservers/table/NameserverGroupTable"),
 );
+
+type Props = {
+  nameserverGroups?: NameserverGroup[];
+  isLoading?: boolean;
+};
 
 export const GroupNameserversSection = ({
   nameserverGroups,
-}: {
-  nameserverGroups?: NameserverGroup[];
-}) => {
+  isLoading = true,
+}: Props) => {
   const { group } = useGroupContext();
 
   return (
     <GroupDetailsTableContainer>
       <NameserverGroupTable
-        isLoading={false}
+        isLoading={isLoading}
         nameserverGroups={nameserverGroups}
         isGroupPage={true}
         distributionGroups={[group]}

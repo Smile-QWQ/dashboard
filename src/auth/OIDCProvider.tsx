@@ -6,10 +6,8 @@ import {
   OidcProvider,
 } from "@axa-fr/react-oidc";
 import FullScreenLoading from "@components/ui/FullScreenLoading";
-import { useLocalStorage } from "@hooks/useLocalStorage";
-import { useRedirect } from "@hooks/useRedirect";
 import loadConfig, { buildExtras } from "@utils/config";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { OIDCError } from "@/auth/OIDCError";
 import { SecureProvider } from "@/auth/SecureProvider";
@@ -24,21 +22,14 @@ const onEvent = (configurationName: any, eventName: any, data: any) => {
   }
 };
 
-export default function OIDCProvider({ children }: Props) {
+export default function OIDCProviderWrapper({ children }: Props) {
   const config = loadConfig();
   const [providerConfig, setProviderConfig] = useState<OidcConfiguration>();
   const [mounted, setMounted] = useState(false);
-  const router = useRouter();
   const path = usePathname();
-  const params = useSearchParams()?.toString();
-  const [, setQueryParams] = useLocalStorage("netbird-query-params", params);
 
   const auth0AuthorityConfig: AuthorityConfiguration = useMemo(
     () => ({
-      /**
-       * Unfortunately Auth0 https://<DOMAIN>/.well-known/openid-configuration doesn't contain end_session_endpoint that
-       * is required for doing logout. Therefore, we need to hardcode the config for auth
-       */
       authorization_endpoint: new URL("authorize", config.authority).href,
       token_endpoint: new URL("oauth/token", config.authority).href,
       revocation_endpoint: new URL("oauth/revoke", config.authority).href,
@@ -49,36 +40,10 @@ export default function OIDCProvider({ children }: Props) {
     [config.authority],
   );
 
-  useEffect(() => {
-    const validParams = [
-      "tab",
-      "search",
-      "id",
-      "invite",
-      "utm_source",
-      "utm_medium",
-      "utm_content",
-      "utm_campaign",
-      "hs_id",
-      "page",
-      "page_size",
-      "user",
-      "port",
-    ];
-
-    try {
-      const urlParams = new URLSearchParams(params);
-      if (validParams.some((param) => urlParams.has(param))) {
-        setQueryParams(params);
-      }
-    } catch (e) {}
-  }, [params, setQueryParams]);
-
   const withCustomHistory = () => {
     return {
       replaceState: (url: any) => {
-        router.replace(url);
-        window.dispatchEvent(new Event("popstate"));
+        window?.location?.replace(url);
       },
     };
   };
@@ -91,8 +56,6 @@ export default function OIDCProvider({ children }: Props) {
       refresh_time_before_tokens_expiration_in_second: 30,
       silent_redirect_uri: window.location.origin + config.silentRedirectURI,
       scope: config.scopesSupported,
-      // disabling service worker
-      //service_worker_relative_url: "/OidcServiceWorker.js",
       service_worker_only: false,
       authority_configuration: config.auth0Auth
         ? auth0AuthorityConfig
@@ -103,23 +66,22 @@ export default function OIDCProvider({ children }: Props) {
         : null),
     });
     setMounted(true);
-  }, [auth0AuthorityConfig, config, path]);
+  }, [auth0AuthorityConfig, config]);
 
-  // We bypass authentication for pages that do not require auth.
-  // E.g., when we just want to show installation steps for public.
-  if (path === "/install") return children;
+  if (path === "/install" || path === "/setup" || path?.startsWith("/invite")) {
+    return children;
+  }
 
   return mounted && providerConfig ? (
     <OidcProvider
       configuration={providerConfig}
-      //withCustomHistory={withCustomHistory}
+      withCustomHistory={withCustomHistory}
       authenticatingComponent={FullScreenLoading}
       authenticatingErrorComponent={OIDCError}
       loadingComponent={FullScreenLoading}
-      callbackSuccessComponent={CallBackSuccess}
+      callbackSuccessComponent={FullScreenLoading}
       onEvent={onEvent}
       onSessionLost={() => void 0}
-      //sessionLostComponent={SessionLost}
     >
       <SecureProvider>{children}</SecureProvider>
     </OidcProvider>
@@ -127,11 +89,3 @@ export default function OIDCProvider({ children }: Props) {
     <FullScreenLoading />
   );
 }
-
-const CallBackSuccess = () => {
-  const params = useSearchParams();
-  const errorParam = params.get("error");
-  const currentPath = usePathname();
-  useRedirect(currentPath, true, !errorParam);
-  return <FullScreenLoading />;
-};

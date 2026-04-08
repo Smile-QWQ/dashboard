@@ -203,6 +203,14 @@ export default function ActivityDescription({ event }: Props) {
       </div>
     );
 
+  if (event.activity_code == "user.create")
+    return (
+      <div className={"inline"}>
+        <Value>{event.meta.username}</Value> <Value>{event.meta.email}</Value>{" "}
+        was created by <Value>{event?.initiator_name || "NetBird"}</Value>
+      </div>
+    );
+
   if (event.activity_code == "user.group.add")
     return (
       <div className={"inline"}>
@@ -266,6 +274,50 @@ export default function ActivityDescription({ event }: Props) {
       <div className={"inline"}>
         User <Value>{event.meta.username}</Value>{" "}
         <Value>{event.meta.email}</Value> was rejected
+      </div>
+    );
+
+  if (event.activity_code == "user.password.change")
+    return (
+      <div className={"inline"}>
+        Password was changed for user <Value>{event.meta.username}</Value>{" "}
+        <Value>{event.meta.email}</Value>
+      </div>
+    );
+
+  /**
+   * User Invite Link
+   */
+
+  if (event.activity_code == "user.invite.link.create")
+    return (
+      <div className={"inline"}>
+        Invite link was created for <Value>{event.meta.username}</Value>{" "}
+        <Value>{event.meta.email}</Value>
+      </div>
+    );
+
+  if (event.activity_code == "user.invite.link.accept")
+    return (
+      <div className={"inline"}>
+        Invite link was accepted by <Value>{event.meta.username}</Value>{" "}
+        <Value>{event.meta.email}</Value>
+      </div>
+    );
+
+  if (event.activity_code == "user.invite.link.regenerate")
+    return (
+      <div className={"inline"}>
+        Invite link was regenerated for <Value>{event.meta.username}</Value>{" "}
+        <Value>{event.meta.email}</Value>
+      </div>
+    );
+
+  if (event.activity_code == "user.invite.link.delete")
+    return (
+      <div className={"inline"}>
+        Invite link was deleted for <Value>{event.meta.username}</Value>{" "}
+        <Value>{event.meta.email}</Value>
       </div>
     );
 
@@ -613,6 +665,35 @@ export default function ActivityDescription({ event }: Props) {
     );
 
   /**
+   * Reverse Proxy
+   */
+
+  if (event.activity_code == "service.peer.expose")
+    return (
+      <div className={"inline"}>
+        Peer <Value>{m.peer_name}</Value> exposed service{" "}
+        <Value>{m.domain}</Value> with auth{" "}
+        <Value>{m.auth ? "Enabled" : "Disabled"}</Value>
+      </div>
+    );
+
+  if (event.activity_code == "service.peer.unexpose")
+    return (
+      <div className={"inline"}>
+        Peer <Value>{m.peer_name}</Value> unexposed service{" "}
+        <Value>{m.domain}</Value>
+      </div>
+    );
+
+  if (event.activity_code == "service.peer.expose.expire")
+    return (
+      <div className={"inline"}>
+        Service <Value>{m.domain}</Value> exposed by peer{" "}
+        <Value>{m.peer_name}</Value> was removed due to renewal expiration
+      </div>
+    );
+
+  /**
    * Networks
    */
 
@@ -685,6 +766,22 @@ export default function ActivityDescription({ event }: Props) {
       </div>
     );
 
+  /**
+   * Jobs
+   */
+
+  if (event.activity_code == "peer.job.create")
+    return (
+      <div className={"inline"}>
+        Remote job <Value>{m.job_type}</Value> created for peer{" "}
+        <Value>{m.for_peer_name}</Value>
+      </div>
+    );
+
+  /**
+   * Flow Settings
+   */
+
   if (event.activity_code == "account.settings.extra.flow.group.remove")
     return (
       <div className={"inline"}>
@@ -696,6 +793,31 @@ export default function ActivityDescription({ event }: Props) {
     return (
       <div className={"inline"}>
         Limit traffic event group <Value>{m.group_name}</Value> added
+      </div>
+    );
+
+  /**
+   * Identity Provider
+   */
+
+  if (event.activity_code == "identityprovider.create")
+    return (
+      <div className={"inline"}>
+        Identity provider <Value>{m.name}</Value> was created
+      </div>
+    );
+
+  if (event.activity_code == "identityprovider.update")
+    return (
+      <div className={"inline"}>
+        Identity provider <Value>{m.name}</Value> was updated
+      </div>
+    );
+
+  if (event.activity_code == "identityprovider.delete")
+    return (
+      <div className={"inline"}>
+        Identity provider <Value>{m.name}</Value> was deleted
       </div>
     );
 

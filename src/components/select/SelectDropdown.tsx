@@ -14,6 +14,7 @@ import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import Skeleton from "react-loading-skeleton";
 import { useElementSize } from "@/hooks/useElementSize";
+import { DropdownInfoText } from "@components/DropdownInfoText";
 
 export interface SelectOption {
   label: string | React.ReactNode;
@@ -23,13 +24,18 @@ export interface SelectOption {
     width?: number;
     country?: string;
   }>;
+  renderItem?: () => React.ReactNode;
+  searchValue?: string;
+  className?: string;
+  disabled?: boolean;
 }
 
 interface SelectDropdownProps {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
-  popoverWidth?: "auto" | number;
+  popoverWidth?: "auto" | "content" | number;
+  popoverMinWidth?: number;
   options: SelectOption[];
   showSearch?: boolean;
   showValues?: boolean;
@@ -41,6 +47,10 @@ interface SelectDropdownProps {
   size?: "xs" | "sm";
   children?: React.ReactNode;
   maxHeight?: number;
+  triggerClassName?: string;
+  iconSize?: number;
+  truncate?: boolean;
+  compact?: boolean;
 }
 
 export function SelectDropdown({
@@ -48,6 +58,7 @@ export function SelectDropdown({
   value,
   disabled = false,
   popoverWidth = "auto",
+  popoverMinWidth,
   options,
   showSearch = false,
   showValues = false,
@@ -59,6 +70,10 @@ export function SelectDropdown({
   size = "sm",
   children,
   maxHeight,
+  triggerClassName,
+  iconSize = 14,
+  truncate = false,
+  compact = false,
 }: Readonly<SelectDropdownProps>) {
   const [inputRef, { width }] = useElementSize<HTMLButtonElement>();
 
@@ -82,7 +97,7 @@ export function SelectDropdown({
   const filteredItems = React.useMemo(() => {
     if (isEmpty(debouncedSearch)) return options;
     return options.filter((item) => {
-      const value = `${item.label}${item.value}` || "";
+      const value = item?.searchValue || `${item.label}${item.value}` || "";
       return value.toLowerCase().includes(debouncedSearch.toLowerCase());
     });
   }, [options, debouncedSearch]);
@@ -98,15 +113,18 @@ export function SelectDropdown({
 
   const SelectedItem = () => {
     return (
-      <div className={"flex items-center gap-2.5"}>
-        {selected?.icon && <selected.icon size={14} width={14} />}
+      <div className={cn("flex items-center gap-2.5", truncate && "min-w-0")}>
+        {selected?.icon && <selected.icon size={iconSize} width={iconSize} />}
         <div
           className={cn(
             "flex flex-col text-sm font-medium",
             size === "xs" && "text-xs",
+            truncate && "min-w-0",
           )}
         >
-          <span className={"text-nb-gray-200"}>{selected?.label}</span>
+          <span className={cn("text-nb-gray-200", truncate && "truncate")}>
+            {selected?.label}
+          </span>
         </div>
       </div>
     );
@@ -139,7 +157,11 @@ export function SelectDropdown({
         setOpen(isOpen);
       }}
     >
-      <PopoverTrigger asChild={!children} disabled={disabled || isLoading}>
+      <PopoverTrigger
+        asChild={!children}
+        disabled={disabled || isLoading}
+        className={triggerClassName}
+      >
         {children ? (
           children
         ) : (
@@ -147,7 +169,7 @@ export function SelectDropdown({
             variant={variant}
             disabled={disabled || isLoading}
             ref={inputRef}
-            className={cn("w-full", className)}
+            className={cn("w-full focus:outline-none", className)}
           >
             <div className={"w-full flex justify-between items-center gap-2"}>
               {isLoading && <Loading />}
@@ -161,9 +183,18 @@ export function SelectDropdown({
         )}
       </PopoverTrigger>
       <PopoverContent
-        className="w-full p-0 shadow-sm  shadow-nb-gray-950 focus:outline-none"
+        className={cn(
+          "p-0 shadow-sm shadow-nb-gray-950 focus:outline-none",
+          popoverWidth !== "content" && "w-full",
+        )}
         style={{
-          width: popoverWidth === "auto" ? width : popoverWidth,
+          width:
+            popoverWidth === "content"
+              ? "auto"
+              : popoverWidth === "auto"
+              ? width
+              : popoverWidth,
+          minWidth: popoverMinWidth,
         }}
         align="start"
         side={"bottom"}
@@ -186,27 +217,30 @@ export function SelectDropdown({
             )}
 
             {filteredItems.length == 0 && (
-              <div className={"text-center pb-2 px-3 text-nb-gray-400 text-xs"}>
-                There are no results matching your search.
-              </div>
+              <DropdownInfoText className={"max-w-sm mx-auto px-4"}>
+                There are no results matching your search. Please try a
+                different search term.
+              </DropdownInfoText>
             )}
 
             <ScrollArea
               className={cn(
-                "overflow-y-auto flex flex-col gap-1 pl-2 pr-3",
-                !showSearch && "pt-2",
+                "overflow-y-auto flex flex-col gap-1",
+                compact ? "pl-1 pr-1" : "pl-2 pr-3",
+                !showSearch && (compact ? "pt-1" : "pt-2"),
               )}
               style={{
                 maxHeight: maxHeight ?? 380,
               }}
             >
               <CommandGroup>
-                <div className={"grid grid-cols-1 gap-1 pb-2"}>
+                <div className={cn("grid grid-cols-1 gap-1 w-full", compact ? "pb-1" : "pb-2")}>
                   {filteredItems.map((option) => (
                     <SelectDropdownItem
                       option={option}
                       toggle={toggle}
                       key={option.value}
+                      iconSize={iconSize}
                       showValue={showValues}
                       size={size}
                     />
@@ -226,11 +260,13 @@ const SelectDropdownItem = ({
   toggle,
   showValue = false,
   size = "sm",
+  iconSize = 14,
 }: {
   option: SelectOption;
   toggle: (value: string) => void;
   showValue?: boolean;
   size: "xs" | "sm";
+  iconSize?: number;
 }) => {
   const value = option.value || "" + option.label || "";
   const elementRef = useRef<HTMLDivElement>(null);
@@ -245,25 +281,40 @@ const SelectDropdownItem = ({
   }, [isVisible]);
 
   return (
-    <div ref={elementRef} className={"transition-all"}>
+    <div ref={elementRef} className={"transition-all w-full"}>
       {visible ? (
         <CommandItem
-          value={value}
+          value={option?.searchValue ?? value}
           ref={elementRef}
-          className={"py-1 px-2"}
-          onSelect={() => toggle(option.value)}
+          className={"py-1 px-2 w-full"}
+          onSelect={() => !option?.disabled && toggle(option.value)}
           onClick={(e) => e.preventDefault()}
+          disabled={option?.disabled}
         >
-          <div className={"flex items-center gap-2.5 p-1"}>
-            {option.icon && <option.icon size={14} width={14} />}
-            <div
-              className={cn(
-                "flex flex-col text-sm font-medium",
-                size === "xs" && "text-xs",
-              )}
-            >
-              <span className={"text-nb-gray-200"}>{option.label}</span>
-            </div>
+          <div
+            className={cn(
+              "flex items-center gap-2.5 p-1 w-full",
+              option?.className,
+              option?.disabled && "cursor-not-allowed",
+            )}
+          >
+            {option.icon && (
+              <div className={"shrink-0"}>
+                <option.icon size={iconSize} width={iconSize} />
+              </div>
+            )}
+
+            {option?.renderItem && option.renderItem()}
+            {!option?.renderItem && (
+              <div
+                className={cn(
+                  "flex flex-col text-sm font-medium w-full",
+                  size === "xs" && "text-xs",
+                )}
+              >
+                <span className={"text-nb-gray-200"}>{option.label}</span>
+              </div>
+            )}
           </div>
           {showValue && (
             <div className={"flex items-center gap-2.5 p-1"}>

@@ -36,6 +36,7 @@ import PeerNameCell from "@/modules/peers/PeerNameCell";
 import { PeerOSCell } from "@/modules/peers/PeerOSCell";
 import PeerStatusCell from "@/modules/peers/PeerStatusCell";
 import PeerVersionCell from "@/modules/peers/PeerVersionCell";
+import { removeAllSpaces } from "@utils/helpers";
 
 const PeersTableColumns: ColumnDef<Peer>[] = [
   {
@@ -137,14 +138,25 @@ const PeersTableColumns: ColumnDef<Peer>[] = [
   },
   {
     accessorKey: "last_seen",
-    header: ({ column }) => {
-      return <DataTableHeader column={column}>Last seen</DataTableHeader>;
+    header: ({ column, table }) => {
+      return (
+        <DataTableHeader
+          column={column}
+          onSort={() => {
+            const desc = column.getIsSorted() === "desc";
+            table.setSorting([{ id: "last_seen", desc: !desc }]);
+          }}
+        >
+          Last seen
+        </DataTableHeader>
+      );
     },
     sortingFn: "datetime",
     cell: ({ row }) => <PeerLastSeenCell peer={row.original} />,
   },
   {
-    accessorKey: "os",
+    id: "os",
+    accessorFn: (peer) => removeAllSpaces(peer?.os),
     header: ({ column }) => {
       return <DataTableHeader column={column}>OS</DataTableHeader>;
     },
@@ -170,6 +182,7 @@ const PeersTableColumns: ColumnDef<Peer>[] = [
         version={row.original.version}
         os={row.original.os}
         serial={row.original.serial_number}
+        ephemeral={row.original.ephemeral}
       />
     ),
   },
@@ -223,16 +236,12 @@ export default function PeersTable({
     "netbird-table-sort" + path,
     [
       {
-        id: "connected",
+        id: "last_seen",
         desc: true,
       },
       {
         id: "name",
         desc: false,
-      },
-      {
-        id: "last_seen",
-        desc: true,
       },
     ],
   );

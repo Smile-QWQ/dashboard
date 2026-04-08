@@ -20,6 +20,7 @@ import GroupsActionCell from "@/modules/groups/table/GroupsActionCell";
 import GroupsCountCell from "@/modules/groups/table/GroupsCountCell";
 import GroupsNameCell from "@/modules/groups/table/GroupsNameCell";
 import useGroupsUsage, { GroupUsage } from "@/modules/groups/useGroupsUsage";
+import DNSZoneIcon from "@/assets/icons/DNSZoneIcon";
 
 export const GroupsTableColumns: ColumnDef<GroupUsage>[] = [
   {
@@ -179,6 +180,28 @@ export const GroupsTableColumns: ColumnDef<GroupUsage>[] = [
     ),
   },
   {
+    accessorKey: "zones_count",
+    header: ({ column }) => {
+      return (
+        <DataTableHeader
+          column={column}
+          tooltip={<div className={"text-xs normal-case"}>Zones</div>}
+        >
+          <DNSZoneIcon size={16} />
+        </DataTableHeader>
+      );
+    },
+    cell: ({ row }) => (
+      <GroupsCountCell
+        icon={<DNSZoneIcon size={14} />}
+        groupName={row.original.name}
+        href={`/group?id=${row.original.id}&tab=zones`}
+        text={"Zone(s)"}
+        count={row.original.zones_count}
+      />
+    ),
+  },
+  {
     accessorKey: "setup_keys_count",
     header: ({ column }) => {
       return (
@@ -216,7 +239,8 @@ export const GroupsTableColumns: ColumnDef<GroupUsage>[] = [
         row.routes_count > 0 ||
         row.setup_keys_count > 0 ||
         row.users_count > 0 ||
-        row.resources_count > 0
+        row.resources_count > 0 ||
+        row.zones_count > 0
       );
     },
   },

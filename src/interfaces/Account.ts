@@ -10,6 +10,8 @@ export interface Account {
       user_approval_required: boolean;
     };
     peer_login_expiration_enabled: boolean;
+    peer_expose_enabled?: boolean;
+    peer_expose_groups?: string[];
     peer_login_expiration: number;
     peer_inactivity_expiration_enabled: boolean;
     peer_inactivity_expiration: number;
@@ -22,5 +24,15 @@ export interface Account {
     dns_domain: string;
     network_range?: string;
     lazy_connection_enabled: boolean;
+    embedded_idp_enabled?: boolean;
+    auto_update_version: string;
+    auto_update_always: boolean;
+    local_auth_disabled?: boolean;
   };
+  onboarding?: AccountOnboarding;
+}
+
+export interface AccountOnboarding {
+  onboarding_flow_pending: boolean;
+  signup_form_pending: boolean;
 }

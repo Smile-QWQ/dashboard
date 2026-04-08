@@ -26,22 +26,25 @@ import { RestrictedAccess } from "@components/ui/RestrictedAccess";
 import TextWithTooltip from "@components/ui/TextWithTooltip";
 import useRedirect from "@hooks/useRedirect";
 import useFetchApi from "@utils/api";
-import { cn } from "@utils/helpers";
+import { singularize } from "@utils/helpers";
 import dayjs from "dayjs";
 import { isEmpty, trim } from "lodash";
 import {
+  ArrowRightIcon,
   Barcode,
   CalendarDays,
   Cpu,
   FlagIcon,
   Globe,
   History,
+  ListIcon,
   MapPin,
   MonitorSmartphoneIcon,
   NetworkIcon,
   PencilIcon,
-  TimerResetIcon,
+  RadioTowerIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toASCII } from "punycode";
 import React, { useMemo, useState } from "react";
@@ -51,20 +54,28 @@ import RoundedFlag from "@/assets/countries/RoundedFlag";
 import CircleIcon from "@/assets/icons/CircleIcon";
 import NetBirdIcon from "@/assets/icons/NetBirdIcon";
 import PeerIcon from "@/assets/icons/PeerIcon";
+import ReverseProxyIcon from "@/assets/icons/ReverseProxyIcon";
 import { useCountries } from "@/contexts/CountryProvider";
 import PeerProvider, { usePeer } from "@/contexts/PeerProvider";
 import { usePermissions } from "@/contexts/PermissionsProvider";
 import RoutesProvider from "@/contexts/RoutesProvider";
 import { useHasChanges } from "@/hooks/useHasChanges";
+import type { Group } from "@/interfaces/Group";
 import type { Peer } from "@/interfaces/Peer";
 import PageContainer from "@/layouts/PageContainer";
 import useGroupHelper from "@/modules/groups/useGroupHelper";
 import { AccessiblePeersSection } from "@/modules/peer/AccessiblePeersSection";
-import { PeerExpirationToggle } from "@/modules/peer/PeerExpirationToggle";
 import { PeerNetworkRoutesSection } from "@/modules/peer/PeerNetworkRoutesSection";
+import { PeerRemoteJobsSection } from "@/modules/peer/PeerRemoteJobsSection";
+import ReverseProxiesProvider, {
+  flattenReverseProxies,
+  useReverseProxies,
+} from "@/contexts/ReverseProxiesProvider";
+import { ReverseProxyFlatTargetsTabContent } from "@/modules/reverse-proxy/targets/flat/ReverseProxyFlatTargetsTabContent";
 import { PeerSSHToggle } from "@/modules/peer/PeerSSHToggle";
 import { RDPButton } from "@/modules/remote-access/rdp/RDPButton";
 import { SSHButton } from "@/modules/remote-access/ssh/SSHButton";
+import { PeerExpirationSettings } from "@/modules/peer/PeerExpirationSettings";
 
 export default function PeerPage() {
   const queryParameter = useSearchParams();
@@ -77,12 +88,6 @@ export default function PeerPage() {
   } = useFetchApi<Peer>("/peers/" + peerId, true);
 
   useRedirect("/peers", false, !peerId || isRestricted);
-
-  const peerKey = useMemo(() => {
-    let id = peer?.id ?? "";
-    let expiration = peer?.login_expiration_enabled ? "1" : "0";
-    return `${id}-${expiration}`;
-  }, [peer]);
 
   if (isRestricted) {
     return (
@@ -102,10 +107,12 @@ export default function PeerPage() {
       />
     );
 
-  return peer && !isLoading ? (
-    <PeerProvider peer={peer} key={peerId} isPeerDetailPage={true}>
-      <PeerOverview key={peerKey} />
-    </PeerProvider>
+  return peer && peer.id && !isLoading ? (
+    <ReverseProxiesProvider initialPeer={peer}>
+      <PeerProvider peer={peer} key={peerId} isPeerDetailPage={true}>
+        <PeerOverview key={peer?.id} />
+      </PeerProvider>
+    </ReverseProxiesProvider>
   ) : (
     <FullScreenLoading />
   );
@@ -117,48 +124,62 @@ function PeerOverview() {
   return (
     <PageContainer>
       <RoutesProvider>
-        <div className={"p-default py-6 pb-0"}>
-          <Breadcrumbs>
-            <Breadcrumbs.Item
-              href={"/peers"}
-              label={"Peers"}
-              icon={<PeerIcon size={13} />}
-            />
-            <Breadcrumbs.Item label={peer.ip} active />
-          </Breadcrumbs>
-          <PeerGeneralInformation />
-        </div>
-        <PeerOverviewTabs />
+        <PeerSettingsProvider>
+          <div className={"p-default py-6 pb-0"}>
+            <Breadcrumbs>
+              <Breadcrumbs.Item
+                href={"/peers"}
+                label={"Peers"}
+                icon={<PeerIcon size={13} />}
+              />
+              <Breadcrumbs.Item label={peer.ip} active />
+            </Breadcrumbs>
+            <PeerHeader />
+          </div>
+          <PeerOverviewTabs />
+        </PeerSettingsProvider>
       </RoutesProvider>
     </PageContainer>
   );
 }
 
-const PeerGeneralInformation = () => {
-  const router = useRouter();
+type PeerSettingsContextType = {
+  selectedGroups: Group[];
+  setSelectedGroups: React.Dispatch<React.SetStateAction<Group[]>>;
+  hasChanges: boolean;
+  updatePeer: (newName?: string) => Promise<void>;
+  name: string;
+  setName: (name: string) => void;
+  tab: string;
+  setTab: (tab: string) => void;
+};
+
+const PeerSettingsContext = React.createContext<PeerSettingsContextType | null>(
+  null,
+);
+
+const usePeerSettings = () => {
+  const context = React.useContext(PeerSettingsContext);
+  if (!context) {
+    throw new Error("usePeerSettings must be used within PeerSettingsProvider");
+  }
+  return context;
+};
+
+const PeerSettingsProvider = ({ children }: { children: React.ReactNode }) => {
   const { mutate } = useSWRConfig();
-  const { peer, user, peerGroups, update } = usePeer();
+  const { peer, peerGroups, update } = usePeer();
+  const { permission } = usePermissions();
   const [name, setName] = useState(peer.name);
-  const [showEditNameModal, setShowEditNameModal] = useState(false);
-  const [loginExpiration, setLoginExpiration] = useState(
-    peer.login_expiration_enabled,
-  );
-  const [inactivityExpiration, setInactivityExpiration] = useState(
-    peer.inactivity_expiration_enabled,
-  );
+  const [tab, setTab] = useState("overview");
   const [selectedGroups, setSelectedGroups, { getAllGroupCalls }] =
     useGroupHelper({
-      initial: peerGroups,
+      initial: peerGroups?.filter((g) => g?.name !== "All"),
       peer,
     });
 
-  /**
-   * Detect if there are changes in the peer information, if there are changes, then enable the save button.
-   */
   const { hasChanges, updateRef: updateHasChangedRef } = useHasChanges([
     selectedGroups,
-    loginExpiration,
-    inactivityExpiration,
   ]);
 
   const updatePeer = async (newName?: string) => {
@@ -168,8 +189,6 @@ const PeerGeneralInformation = () => {
     if (permission.peers.update) {
       const updateRequest = update({
         name: newName ?? name,
-        loginExpiration,
-        inactivityExpiration,
       });
       batchCall = groupCalls ? [...groupCalls, updateRequest] : [updateRequest];
     } else {
@@ -182,17 +201,37 @@ const PeerGeneralInformation = () => {
       promise: Promise.all(batchCall).then(() => {
         mutate("/peers/" + peer.id);
         mutate("/groups");
-        updateHasChangedRef([
-          selectedGroups,
-          loginExpiration,
-          inactivityExpiration,
-        ]);
+        updateHasChangedRef([selectedGroups]);
       }),
       loadingMessage: "Saving the peer...",
     });
   };
 
+  return (
+    <PeerSettingsContext.Provider
+      value={{
+        selectedGroups,
+        setSelectedGroups,
+        hasChanges,
+        updatePeer,
+        name,
+        setName,
+        tab,
+        setTab,
+      }}
+    >
+      {children}
+    </PeerSettingsContext.Provider>
+  );
+};
+
+const PeerHeader = () => {
+  const router = useRouter();
+  const { peer, user } = usePeer();
   const { permission } = usePermissions();
+  const { name, setName, hasChanges, updatePeer, tab } = usePeerSettings();
+  const [showEditNameModal, setShowEditNameModal] = useState(false);
+  const isOverviewTab = tab === "overview";
 
   return (
     <>
@@ -237,87 +276,161 @@ const PeerGeneralInformation = () => {
             </h1>
             <LoginExpiredBadge loginExpired={peer.login_expired} />
           </div>
-          <div className={"flex items-center gap-8"}>
-            <Paragraph className={"flex items-center"}>{user?.email}</Paragraph>
+          {(user?.id || user?.email) && (
+            <div className={"flex items-center gap-8"}>
+              <Paragraph className={"flex items-center"}>
+                <Link
+                  href={`/team/user?id=${user?.id}`}
+                  className={
+                    "hover:text-nb-gray-200 transition-all flex items-center gap-1"
+                  }
+                >
+                  {user?.email || user?.id}
+                  <ArrowRightIcon size={14} />
+                </Link>
+              </Paragraph>
+            </div>
+          )}
+        </div>
+        {isOverviewTab && (
+          <div className={"flex gap-4"}>
+            <Button
+              variant={"default"}
+              className={"w-full"}
+              onClick={() => router.push("/peers")}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={"primary"}
+              className={"w-full"}
+              onClick={() => updatePeer()}
+              disabled={
+                !hasChanges ||
+                !permission.peers.update ||
+                !permission.groups.update
+              }
+            >
+              Save Changes
+            </Button>
           </div>
-        </div>
-        <div className={"flex gap-4"}>
-          <Button
-            variant={"default"}
-            className={"w-full"}
-            onClick={() => router.push("/peers")}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant={"primary"}
-            className={"w-full"}
-            onClick={() => updatePeer()}
-            disabled={
-              !hasChanges || !permission.peers.read || !permission.groups.update
-            }
-          >
-            Save Changes
-          </Button>
-        </div>
+        )}
       </div>
+    </>
+  );
+};
 
+const PeerOverviewTabs = () => {
+  const { peer } = usePeer();
+  const { permission } = usePermissions();
+  const { reverseProxies, isLoading: isServicesLoading } = useReverseProxies();
+  const { tab, setTab } = usePeerSettings();
+
+  const flatTargets = useMemo(
+    () => flattenReverseProxies({ reverseProxies, peer }),
+    [reverseProxies, peer],
+  );
+
+  return (
+    <Tabs
+      defaultValue={tab}
+      onValueChange={setTab}
+      value={tab}
+      className={"pt-4 pb-0 mb-0"}
+    >
+      <TabsList justify={"start"} className={"px-8"}>
+        <TabsTrigger value={"overview"}>
+          <ListIcon size={16} />
+          Overview
+        </TabsTrigger>
+
+        {permission.routes.read && (
+          <TabsTrigger value={"network-routes"}>
+            <NetworkIcon size={16} />
+            Network Routes
+          </TabsTrigger>
+        )}
+
+        {peer?.id && permission.peers.read && (
+          <TabsTrigger value={"accessible-peers"}>
+            <MonitorSmartphoneIcon size={16} />
+            Accessible Peers
+          </TabsTrigger>
+        )}
+
+        {peer?.id && permission.services?.read && (
+          <TabsTrigger value={"reverse-proxies"}>
+            <ReverseProxyIcon
+              size={16}
+              className="fill-nb-gray-400 group-data-[state=active]/trigger:fill-netbird"
+            />
+            {singularize("Services", flatTargets.length)}
+          </TabsTrigger>
+        )}
+
+        {peer?.id && permission.peers.delete && (
+          <TabsTrigger value={"peer-job"}>
+            <RadioTowerIcon size={16} />
+            Remote Jobs
+          </TabsTrigger>
+        )}
+      </TabsList>
+
+      <TabsContent value={"overview"} className={"pb-8"}>
+        <PeerOverviewTabContent />
+      </TabsContent>
+
+      {permission.routes.read && (
+        <TabsContent value={"network-routes"} className={"pb-8"}>
+          <PeerNetworkRoutesSection peer={peer} />
+        </TabsContent>
+      )}
+
+      {peer?.id && permission.peers.read && (
+        <TabsContent value={"accessible-peers"} className={"pb-8"}>
+          <AccessiblePeersSection peerID={peer.id} />
+        </TabsContent>
+      )}
+
+      {peer?.id && permission.services?.read && (
+        <TabsContent value={"reverse-proxies"} className={"pb-8"}>
+          <ReverseProxyFlatTargetsTabContent
+            targets={flatTargets}
+            isLoading={isServicesLoading}
+            hideResourceColumn
+            emptyTableTitle={"This peer has no services"}
+            emptyTableDescription={
+              "Add your services to this peer and securely expose them through NetBird's reverse proxy"
+            }
+          />
+        </TabsContent>
+      )}
+
+      {peer.id && permission.peers.delete && (
+        <TabsContent value={"peer-job"} className={"pb-8"}>
+          <PeerRemoteJobsSection peerID={peer.id} />
+        </TabsContent>
+      )}
+    </Tabs>
+  );
+};
+
+const PeerOverviewTabContent = () => {
+  const { peer } = usePeer();
+  const { permission } = usePermissions();
+  const { selectedGroups, setSelectedGroups } = usePeerSettings();
+
+  return (
+    <div className={"px-8"}>
       <div
         className={
-          "flex-wrap xl:flex-nowrap flex gap-10 w-full mt-5 max-w-6xl items-start"
+          "flex-wrap xl:flex-nowrap flex gap-10 w-full items-start pt-2 max-w-6xl"
         }
       >
         <PeerInformationCard peer={peer} />
 
-        <div className={"flex flex-col gap-6 lg:w-1/2 transition-all"}>
-          <div>
-            <PeerExpirationToggle
-              peer={peer}
-              value={loginExpiration}
-              icon={<TimerResetIcon size={16} />}
-              onChange={(state) => {
-                setLoginExpiration(state);
-                !state && setInactivityExpiration(false);
-              }}
-            />
-            {permission.peers.update && !!peer?.user_id && (
-              <div
-                className={cn(
-                  "border border-nb-gray-900 border-t-0 rounded-b-md bg-nb-gray-940 px-[1.28rem] pt-3 pb-5 flex flex-col gap-4 mx-[0.25rem]",
-                  !loginExpiration
-                    ? "opacity-50 pointer-events-none"
-                    : "bg-nb-gray-930/80",
-                )}
-              >
-                <PeerExpirationToggle
-                  peer={peer}
-                  variant={"blank"}
-                  value={inactivityExpiration}
-                  onChange={setInactivityExpiration}
-                  title={"Require login after disconnect"}
-                  description={
-                    "Enable to require authentication after users disconnect from management for 10 minutes."
-                  }
-                  className={
-                    !loginExpiration ? "opacity-40 pointer-events-none" : ""
-                  }
-                />
-              </div>
-            )}
-          </div>
-
-          <PeerSSHToggle />
-
-          {/* Remote Access Buttons */}
-          <div>
-            <Label>Remote Access</Label>
-            <HelpText>Connect directly to this peer via SSH or RDP.</HelpText>
-            <div className="flex gap-3">
-              <SSHButton peer={peer} />
-              <RDPButton peer={peer} />
-            </div>
-          </div>
-
+        <div className={"flex flex-col gap-8 lg:w-1/2 transition-all"}>
+          <PeerExpirationSettings />
           {permission.groups.read && (
             <div>
               <Label>Assigned Groups</Label>
@@ -333,55 +446,21 @@ const PeerGeneralInformation = () => {
               />
             </div>
           )}
+
+          <PeerSSHToggle />
+
+          {/* Remote Access Buttons */}
+          <div>
+            <Label>Remote Access</Label>
+            <HelpText>Connect directly to this peer via SSH or RDP.</HelpText>
+            <div className="flex gap-3">
+              <SSHButton peer={peer} />
+              <RDPButton peer={peer} />
+            </div>
+          </div>
         </div>
       </div>
-    </>
-  );
-};
-
-const PeerOverviewTabs = () => {
-  const { peer } = usePeer();
-  const { permission } = usePermissions();
-
-  const [tab, setTab] = useState(
-    permission.routes.read ? "network-routes" : "accessible-peers",
-  );
-
-  return (
-    <Tabs
-      defaultValue={tab}
-      onValueChange={(v) => setTab(v)}
-      value={tab}
-      className={"pt-10 pb-0 mb-0"}
-    >
-      <TabsList justify={"start"} className={"px-8"}>
-        {permission.routes.read && (
-          <TabsTrigger value={"network-routes"}>
-            <NetworkIcon size={16} />
-            Network Routes
-          </TabsTrigger>
-        )}
-
-        {peer?.id && permission.peers.read && (
-          <TabsTrigger value={"accessible-peers"}>
-            <MonitorSmartphoneIcon size={16} />
-            Accessible Peers
-          </TabsTrigger>
-        )}
-      </TabsList>
-
-      {permission.routes.read && (
-        <TabsContent value={"network-routes"} className={"pb-8"}>
-          <PeerNetworkRoutesSection peer={peer} />
-        </TabsContent>
-      )}
-
-      {peer?.id && permission.peers.read && (
-        <TabsContent value={"accessible-peers"} className={"pb-8"}>
-          <AccessiblePeersSection peerID={peer.id} />
-        </TabsContent>
-      )}
-    </Tabs>
+    </div>
   );
 };
 

@@ -43,7 +43,7 @@ const DEFAULT_REDIRECT_URI = "/auth";
 const DEFAULT_SILENT_REDIRECT_URI = "/silent-auth";
 const DEFAULT_TOKEN_SOURCE = "accessToken";
 const DEFAULT_DRAG_QUERY_PARAMS = false;
-const DEFAULT_WASM_PATH = "https://pkgs.netbird.io/wasm/client/v0.59.11";
+const DEFAULT_WASM_PATH = "https://pkgs.netbird.io/wasm/client/v0.63.0";
 const RUNTIME_CONFIG_URL = "/config.json";
 
 let cachedConfig: Config | null = null;
@@ -55,9 +55,7 @@ declare global {
 }
 
 const isPlaceholderValue = (value: unknown) => {
-  return (
-    typeof value === "string" && /^\$[A-Z0-9_]+$/.test(value.trim())
-  );
+  return typeof value === "string" && /^\$[A-Z0-9_]+$/.test(value.trim());
 };
 
 const parseBoolean = (value: unknown) => {
@@ -95,8 +93,7 @@ const normalizeConfig = (configJson: RawConfig): Config => {
     authority,
     clientId: parseOptionalString(configJson.authClientId) || "",
     clientSecret: parseOptionalString(configJson.authClientSecret) || "",
-    scopesSupported:
-      parseOptionalString(configJson.authScopesSupported) || "",
+    scopesSupported: parseOptionalString(configJson.authScopesSupported) || "",
     apiOrigin: parseOptionalString(configJson.apiOrigin) || "",
     grpcApiOrigin: parseOptionalString(configJson.grpcApiOrigin) || "",
     audience: parseOptionalString(configJson.authAudience) || "",
@@ -154,7 +151,10 @@ export const setRuntimeConfig = (configJson: RawConfig) => {
 export const initializeRuntimeConfig = async () => {
   if (cachedConfig) return cachedConfig;
 
-  if (process.env.APP_ENV === "test" || process.env.NODE_ENV === "development") {
+  if (
+    process.env.APP_ENV === "test" ||
+    process.env.NODE_ENV === "development"
+  ) {
     return setRuntimeConfig(getBundledConfig());
   }
 
@@ -195,7 +195,10 @@ const loadConfig = (): Config => {
     return setRuntimeConfig(window.__NETBIRD_RUNTIME_CONFIG__);
   }
 
-  if (process.env.APP_ENV === "test" || process.env.NODE_ENV === "development") {
+  if (
+    process.env.APP_ENV === "test" ||
+    process.env.NODE_ENV === "development"
+  ) {
     return setRuntimeConfig(getBundledConfig());
   }
 
