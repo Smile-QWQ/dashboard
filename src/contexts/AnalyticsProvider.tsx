@@ -31,9 +31,9 @@ const AnalyticsContext = React.createContext(
     trackGTMCustomEvent: (name: string) => void;
   },
 );
-const config = loadConfig();
 
 export default function AnalyticsProvider({ children }: Readonly<Props>) {
+  const config = loadConfig();
   const [initialized, setInitialized] = useState(false);
   const path = usePathname();
 
@@ -53,7 +53,7 @@ export default function AnalyticsProvider({ children }: Readonly<Props>) {
       hotjar.initialize(hjid, 6);
     }
     setInitialized(true);
-  }, []);
+  }, [config.googleAnalyticsID, config.hotjarTrackID, initialized]);
 
   const trackPageView = () => {
     if (!initialized) return;
@@ -114,6 +114,7 @@ export default function AnalyticsProvider({ children }: Readonly<Props>) {
 }
 
 export const GoogleTagManagerHeadScript = () => {
+  const config = loadConfig();
   if (!config.googleTagManagerID) return null;
   return (
     isProduction() && (
@@ -129,6 +130,7 @@ export const GoogleTagManagerHeadScript = () => {
 };
 
 const GoogleTageManagerBodyScript = () => {
+  const config = loadConfig();
   if (!config.googleTagManagerID) return null;
   return (
     isProduction() && (

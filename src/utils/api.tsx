@@ -18,8 +18,6 @@ export type ErrorResponse = {
   message: string;
 };
 
-const config = loadConfig();
-
 type RequestOptions = {
   key?: string;
   signal?: AbortSignal;
@@ -39,6 +37,7 @@ async function apiRequest<T>(
   data?: any,
   options?: RequestOptions,
 ) {
+  const config = loadConfig();
   const origin = options?.origin ? options?.origin : config.apiOrigin + "/api";
   let newUrl = mergeUrlParams(
     url,
@@ -73,6 +72,7 @@ async function apiRequest<T>(
 export function useNetBirdFetch(ignoreError: boolean = false): {
   fetch: (input: RequestInfo, init?: RequestInit) => Promise<Response>;
 } {
+  const config = loadConfig();
   const tokenSource = config.tokenSource || "accessToken";
   const { idToken } = useOidcIdToken();
   const { accessToken } = useOidcAccessToken();

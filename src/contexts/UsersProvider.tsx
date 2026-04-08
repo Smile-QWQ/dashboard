@@ -7,8 +7,6 @@ import { useApplicationContext } from "@/contexts/ApplicationProvider";
 import PermissionsProvider from "@/contexts/PermissionsProvider";
 import { Role, User } from "@/interfaces/User";
 
-const config = loadConfig();
-
 type Props = {
   children: React.ReactNode;
 };
@@ -85,6 +83,7 @@ const UserProfileProvider = ({ children }: Props) => {
 export const useUserProfile = () => React.useContext(UserProfileContext);
 
 export const useLoggedInUser = () => {
+  const config = loadConfig();
   const { loggedInUser } = useUserProfile();
   const { logout: oidcLogout } = useOidc();
   const { setGlobalApiParams } = useApplicationContext();

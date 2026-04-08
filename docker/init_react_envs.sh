@@ -65,13 +65,11 @@ export NETBIRD_WASM_PATH=${NETBIRD_WASM_PATH}
 
 echo "NetBird latest version: ${NETBIRD_LATEST_VERSION}"
 
-# replace ENVs in the config
+# replace ENVs in the docker runtime config template
 ENV_STR="\$\$USE_AUTH0 \$\$AUTH_AUDIENCE \$\$AUTH_AUTHORITY \$\$AUTH_CLIENT_ID \$\$AUTH_CLIENT_SECRET \$\$AUTH_SUPPORTED_SCOPES \$\$NETBIRD_MGMT_API_ENDPOINT \$\$NETBIRD_MGMT_GRPC_API_ENDPOINT \$\$NETBIRD_HOTJAR_TRACK_ID \$\$NETBIRD_GOOGLE_ANALYTICS_ID \$\$NETBIRD_GOOGLE_TAG_MANAGER_ID \$\$AUTH_REDIRECT_URI \$\$AUTH_SILENT_REDIRECT_URI \$\$NETBIRD_TOKEN_SOURCE \$\$NETBIRD_DRAG_QUERY_PARAMS \$\$NETBIRD_WASM_PATH"
 
-OIDC_TRUSTED_DOMAINS="/usr/share/nginx/html/OidcTrustedDomains.js"
-envsubst "$ENV_STR" < "$OIDC_TRUSTED_DOMAINS".tmpl > "$OIDC_TRUSTED_DOMAINS"
-for f in $(grep -R -l AUTH_SUPPORTED_SCOPES /usr/share/nginx/html); do
-    cp "$f" "$f".copy
-    envsubst "$ENV_STR" < "$f".copy > "$f"
-    rm "$f".copy
-done
+RUNTIME_CONFIG_TEMPLATE="/app/docker/config.json.tmpl"
+RUNTIME_CONFIG="/usr/share/nginx/html/config.json"
+TEMP_CONFIG="$(mktemp)"
+envsubst "$ENV_STR" < "$RUNTIME_CONFIG_TEMPLATE" > "$TEMP_CONFIG"
+mv "$TEMP_CONFIG" "$RUNTIME_CONFIG"

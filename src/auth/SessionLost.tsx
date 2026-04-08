@@ -8,9 +8,8 @@ import * as React from "react";
 import { useEffect } from "react";
 import NetBirdIcon from "@/assets/icons/NetBirdIcon";
 
-const config = loadConfig();
-
 export const SessionLost = () => {
+  const config = loadConfig();
   const router = useRouter();
   const { logout } = useOidc();
 

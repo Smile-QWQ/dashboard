@@ -1,7 +1,7 @@
 import Code from "@components/Code";
 import Steps from "@components/Steps";
 import TabsContentPadding, { TabsContent } from "@components/Tabs";
-import { GRPC_API_ORIGIN } from "@utils/netbird";
+import { getGrpcApiOrigin } from "@utils/netbird";
 import { ShoppingBagIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,6 +10,7 @@ import AppStoreButton from "@/assets/app-store-badge.png";
 import { OperatingSystem } from "@/interfaces/OperatingSystem";
 
 export default function IOSTab() {
+  const grpcApiOrigin = getGrpcApiOrigin();
   return (
     <TabsContent value={String(OperatingSystem.IOS)}>
       <TabsContentPadding>
@@ -33,24 +34,24 @@ export default function IOSTab() {
               </Link>
             </div>
           </Steps.Step>
-          {GRPC_API_ORIGIN && (
+          {grpcApiOrigin && (
             <Steps.Step step={2}>
               <p>
                 {`Click on "Change Server" and enter the following "Server"`}
               </p>
               <Code>
-                <Code.Line>{GRPC_API_ORIGIN}</Code.Line>
+                <Code.Line>{grpcApiOrigin}</Code.Line>
               </Code>
             </Steps.Step>
           )}
 
-          <Steps.Step step={GRPC_API_ORIGIN ? 3 : 2}>
+          <Steps.Step step={grpcApiOrigin ? 3 : 2}>
             <p>
               {/* eslint-disable-next-line react/no-unescaped-entities */}
               Click on the "Connect" button in the middle of the screen
             </p>
           </Steps.Step>
-          <Steps.Step step={GRPC_API_ORIGIN ? 4 : 3} line={false}>
+          <Steps.Step step={grpcApiOrigin ? 4 : 3} line={false}>
             <p>Sign up using your email address</p>
           </Steps.Step>
         </Steps>

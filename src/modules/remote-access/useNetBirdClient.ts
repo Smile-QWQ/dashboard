@@ -3,19 +3,16 @@ import loadConfig from "@utils/config";
 import { getBrowserInfo } from "@utils/helpers";
 import { generateKeypair } from "@utils/wireguard";
 import { trim } from "lodash";
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import { IronRDPWASMBridge } from "@/modules/remote-access/rdp/ironrdp-wasm-bridge";
 import { RDPCertificateHandler } from "@/modules/remote-access/rdp/rdp-certificate-handler";
 import { installWebSocketProxy } from "@/modules/remote-access/rdp/websocket-proxy";
-
-const config = loadConfig();
-
-const WASM_CONFIG = {
-  SCRIPT_PATH: "/wasm_exec.js",
-  WASM_PATH: config.wasmPath,
-  INIT_TIMEOUT: 10000,
-  RETRY_DELAY: 100,
-} as const;
 
 export enum NetBirdStatus {
   DISCONNECTED = 0,
@@ -61,6 +58,17 @@ class NetBirdStore {
 const netBirdStore = new NetBirdStore();
 
 export const useNetBirdClient = () => {
+  const config = loadConfig();
+  const wasmConfig = useMemo(
+    () =>
+      ({
+        SCRIPT_PATH: "/wasm_exec.js",
+        WASM_PATH: config.wasmPath,
+        INIT_TIMEOUT: 10000,
+        RETRY_DELAY: 100,
+      }) as const,
+    [config.wasmPath],
+  );
   const netBirdClient = useRef<any>(null);
   const state = useSyncExternalStore(
     netBirdStore.subscribe,
@@ -76,38 +84,38 @@ export const useNetBirdClient = () => {
   }>({ bridge: null, certificateHandler: null });
 
   const loadWASMRuntime = useCallback((): Promise<void> => {
-    if (document.querySelector(`script[src="${WASM_CONFIG.SCRIPT_PATH}"]`)) {
+    if (document.querySelector(`script[src="${wasmConfig.SCRIPT_PATH}"]`)) {
       return Promise.resolve();
     }
 
     return new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = WASM_CONFIG.SCRIPT_PATH;
+      script.src = wasmConfig.SCRIPT_PATH;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("Failed to load WASM runtime"));
       document.head.appendChild(script);
     });
-  }, []);
+  }, [wasmConfig.SCRIPT_PATH]);
 
   const loadGoClient = useCallback(async (): Promise<void> => {
     if ((window as any).NetBirdClient) return;
 
     const go = new (window as any).Go();
     const wasmModule = await WebAssembly.instantiateStreaming(
-      fetch(WASM_CONFIG.WASM_PATH),
+      fetch(wasmConfig.WASM_PATH),
       go.importObject,
     );
     go.run(wasmModule.instance);
 
     const start = Date.now();
-    while (Date.now() - start < WASM_CONFIG.INIT_TIMEOUT) {
+    while (Date.now() - start < wasmConfig.INIT_TIMEOUT) {
       if ((window as any).NetBirdClient) return;
       await new Promise((resolve) =>
-        setTimeout(resolve, WASM_CONFIG.RETRY_DELAY),
+        setTimeout(resolve, wasmConfig.RETRY_DELAY),
       );
     }
     throw new Error("NetBird WASM failed to initialize in time");
-  }, []);
+  }, [wasmConfig.INIT_TIMEOUT, wasmConfig.RETRY_DELAY, wasmConfig.WASM_PATH]);
 
   const initIronRDP = useCallback(() => {
     if (rdpComponents.current.bridge) return;
@@ -193,7 +201,7 @@ export const useNetBirdClient = () => {
         return false;
       }
     },
-    [initialize],
+    [config.apiOrigin, initialize],
   );
 
   const disconnect = useCallback(async (): Promise<void> => {

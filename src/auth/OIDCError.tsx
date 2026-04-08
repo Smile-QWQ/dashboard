@@ -8,9 +8,8 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import NetBirdIcon from "@/assets/icons/NetBirdIcon";
 
-const config = loadConfig();
-
 export const OIDCError = () => {
+  const config = loadConfig();
   const { oidcUserLoadingState } = useOidcUser();
   const params = useSearchParams();
   const errorParam = params.get("error");

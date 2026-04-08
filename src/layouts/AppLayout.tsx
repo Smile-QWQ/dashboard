@@ -13,12 +13,12 @@ import { Toaster } from "react-hot-toast";
 import OIDCProvider from "@/auth/OIDCProvider";
 import FullScreenLoading from "@/components/ui/FullScreenLoading";
 import AnalyticsProvider, {
-  GoogleTagManagerHeadScript,
 } from "@/contexts/AnalyticsProvider";
 import DialogProvider from "@/contexts/DialogProvider";
 import ErrorBoundaryProvider from "@/contexts/ErrorBoundary";
 import { GlobalThemeProvider } from "@/contexts/GlobalThemeProvider";
 import { NavigationEvents } from "@/contexts/NavigationEvents";
+import RuntimeConfigProvider from "@/contexts/RuntimeConfigProvider";
 
 const inter = localFont({
   src: "../assets/fonts/Inter.ttf",
@@ -38,33 +38,32 @@ export default function AppLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <head>
-        <GoogleTagManagerHeadScript />
-      </head>
       <body className={cn(inter.className, "dark:bg-nb-gray bg-gray-50")}>
-        <Suspense fallback={<FullScreenLoading />}>
-          <AnalyticsProvider>
-            <DialogProvider>
-              <GlobalThemeProvider>
-                <ErrorBoundaryProvider>
-                  <OIDCProvider>
-                    <TooltipProvider delayDuration={0}>
-                      {children}
-                    </TooltipProvider>
-                  </OIDCProvider>
-                </ErrorBoundaryProvider>
-              </GlobalThemeProvider>
-            </DialogProvider>
-            <Toaster
-              position={"top-center"}
-              toastOptions={{
-                duration: 3000,
-              }}
-            />
-            <NavigationEvents />
-            <DisableDarkReader />
-          </AnalyticsProvider>
-        </Suspense>
+        <RuntimeConfigProvider>
+          <Suspense fallback={<FullScreenLoading />}>
+            <AnalyticsProvider>
+              <DialogProvider>
+                <GlobalThemeProvider>
+                  <ErrorBoundaryProvider>
+                    <OIDCProvider>
+                      <TooltipProvider delayDuration={0}>
+                        {children}
+                      </TooltipProvider>
+                    </OIDCProvider>
+                  </ErrorBoundaryProvider>
+                </GlobalThemeProvider>
+              </DialogProvider>
+              <Toaster
+                position={"top-center"}
+                toastOptions={{
+                  duration: 3000,
+                }}
+              />
+              <NavigationEvents />
+              <DisableDarkReader />
+            </AnalyticsProvider>
+          </Suspense>
+        </RuntimeConfigProvider>
       </body>
     </html>
   );

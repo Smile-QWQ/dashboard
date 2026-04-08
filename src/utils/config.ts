@@ -1,7 +1,26 @@
 import { StringMap } from "@axa-fr/react-oidc";
 import { validator } from "@utils/helpers";
 
-interface Config {
+type RawConfig = {
+  auth0Auth?: boolean | string;
+  authAuthority?: string;
+  authClientId?: string;
+  authClientSecret?: string;
+  authScopesSupported?: string;
+  authAudience?: string;
+  apiOrigin?: string;
+  grpcApiOrigin?: string;
+  redirectURI?: string;
+  silentRedirectURI?: string;
+  tokenSource?: string;
+  dragQueryParams?: boolean | string;
+  hotjarTrackID?: number | string;
+  googleAnalyticsID?: string;
+  googleTagManagerID?: string;
+  wasmPath?: string;
+};
+
+export interface Config {
   auth0Auth: boolean;
   authority: string;
   clientId: string;
@@ -20,56 +39,169 @@ interface Config {
   wasmPath: string;
 }
 
-/**
- * Load the config from the config.json file
- */
-const loadConfig = (): Config => {
-  let configJson: any;
-  let redirectURI = "/#callback";
-  let silentRedirectURI = "/#silent-callback";
-  let tokenSource = "accessToken";
+const DEFAULT_REDIRECT_URI = "/auth";
+const DEFAULT_SILENT_REDIRECT_URI = "/silent-auth";
+const DEFAULT_TOKEN_SOURCE = "accessToken";
+const DEFAULT_DRAG_QUERY_PARAMS = false;
+const DEFAULT_WASM_PATH = "https://pkgs.netbird.io/wasm/client/v0.59.11";
+const RUNTIME_CONFIG_URL = "/config.json";
 
-  if (process.env.APP_ENV === "test") {
-    configJson = require("@/config/test");
-  } else if (process.env.NODE_ENV === "development") {
-    configJson = require("@/config/local");
-  } else if (process.env.NODE_ENV === "production") {
-    configJson = require("@/config/production");
+let cachedConfig: Config | null = null;
+
+declare global {
+  interface Window {
+    __NETBIRD_RUNTIME_CONFIG__?: RawConfig;
   }
+}
 
-  if (configJson.redirectURI) {
-    redirectURI = configJson.redirectURI;
-  }
+const isPlaceholderValue = (value: unknown) => {
+  return (
+    typeof value === "string" && /^\$[A-Z0-9_]+$/.test(value.trim())
+  );
+};
 
-  if (configJson.silentRedirectURI) {
-    silentRedirectURI = configJson.silentRedirectURI;
-  }
+const parseBoolean = (value: unknown) => {
+  if (typeof value === "boolean") return value;
+  return String(value).toLowerCase() === "true";
+};
 
-  if (configJson.tokenSource) {
-    tokenSource = configJson.tokenSource;
-  }
+const parseOptionalString = (value: unknown) => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
 
-  const authority = configJson.authAuthority.replace(/\/+$/, "");
+const parseOptionalNumber = (value: unknown) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (trimmed === "") return undefined;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const normalizeConfig = (configJson: RawConfig): Config => {
+  const authoritySource = parseOptionalString(configJson.authAuthority)?.replace(
+    /\/+$/,
+    "",
+  );
+  const authority =
+    authoritySource && validator.isValidUrl(authoritySource)
+      ? authoritySource
+      : "http://localhost";
 
   return {
-    auth0Auth: configJson.auth0Auth == "true", // Due to substitution we can't use boolean in the config
-    authority: validator.isValidUrl(authority) ? authority : "http://localhost",
-    clientId: configJson.authClientId,
-    clientSecret: configJson.authClientSecret,
-    scopesSupported: configJson.authScopesSupported,
-    apiOrigin: configJson.apiOrigin,
-    grpcApiOrigin: configJson.grpcApiOrigin,
-    audience: configJson.authAudience,
-    redirectURI: redirectURI,
-    silentRedirectURI: silentRedirectURI,
-    tokenSource: tokenSource,
-    dragQueryParams: configJson.dragQueryParams == "true", // Drags all the query params to the auth layer specified in the URL when accessing dashboard.
-    hotjarTrackID: configJson?.hotjarTrackID || undefined,
-    googleAnalyticsID: configJson?.googleAnalyticsID || undefined,
-    googleTagManagerID: configJson?.googleTagManagerID || undefined,
-    wasmPath:
-      configJson.wasmPath || "https://pkgs.netbird.io/wasm/client/v0.59.11",
-  } as Config;
+    auth0Auth: parseBoolean(configJson.auth0Auth),
+    authority,
+    clientId: parseOptionalString(configJson.authClientId) || "",
+    clientSecret: parseOptionalString(configJson.authClientSecret) || "",
+    scopesSupported:
+      parseOptionalString(configJson.authScopesSupported) || "",
+    apiOrigin: parseOptionalString(configJson.apiOrigin) || "",
+    grpcApiOrigin: parseOptionalString(configJson.grpcApiOrigin) || "",
+    audience: parseOptionalString(configJson.authAudience) || "",
+    redirectURI:
+      parseOptionalString(configJson.redirectURI) || DEFAULT_REDIRECT_URI,
+    silentRedirectURI:
+      parseOptionalString(configJson.silentRedirectURI) ||
+      DEFAULT_SILENT_REDIRECT_URI,
+    tokenSource:
+      parseOptionalString(configJson.tokenSource) || DEFAULT_TOKEN_SOURCE,
+    dragQueryParams:
+      configJson.dragQueryParams === undefined
+        ? DEFAULT_DRAG_QUERY_PARAMS
+        : parseBoolean(configJson.dragQueryParams),
+    hotjarTrackID: parseOptionalNumber(configJson.hotjarTrackID),
+    googleAnalyticsID: parseOptionalString(configJson.googleAnalyticsID),
+    googleTagManagerID: parseOptionalString(configJson.googleTagManagerID),
+    wasmPath: parseOptionalString(configJson.wasmPath) || DEFAULT_WASM_PATH,
+  };
+};
+
+const getConfigValidationErrors = (configJson: RawConfig) => {
+  const requiredFields: Array<keyof RawConfig> = [
+    "auth0Auth",
+    "authAuthority",
+    "authClientId",
+    "authScopesSupported",
+    "apiOrigin",
+  ];
+
+  return requiredFields.filter((field) => {
+    const value = configJson[field];
+    if (value === undefined || value === null) return true;
+    if (typeof value === "string") {
+      return value.trim() === "" || isPlaceholderValue(value);
+    }
+    return false;
+  });
+};
+
+const getBundledConfig = (): RawConfig => {
+  return require("../../config.json");
+};
+
+export const setRuntimeConfig = (configJson: RawConfig) => {
+  cachedConfig = normalizeConfig(configJson);
+
+  if (typeof window !== "undefined") {
+    window.__NETBIRD_RUNTIME_CONFIG__ = configJson;
+  }
+
+  return cachedConfig;
+};
+
+export const initializeRuntimeConfig = async () => {
+  if (cachedConfig) return cachedConfig;
+
+  if (process.env.APP_ENV === "test" || process.env.NODE_ENV === "development") {
+    return setRuntimeConfig(getBundledConfig());
+  }
+
+  const response = await fetch(RUNTIME_CONFIG_URL, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to load runtime config from ${RUNTIME_CONFIG_URL} (${response.status})`,
+    );
+  }
+
+  const configJson = (await response.json()) as RawConfig;
+  const validationErrors = getConfigValidationErrors(configJson);
+
+  if (validationErrors.length > 0) {
+    throw new Error(
+      `Runtime config is missing required values: ${validationErrors.join(", ")}`,
+    );
+  }
+
+  return setRuntimeConfig(configJson);
+};
+
+/**
+ * Load the config from the current runtime source.
+ */
+const loadConfig = (): Config => {
+  if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    window.__NETBIRD_RUNTIME_CONFIG__ !== undefined
+  ) {
+    return setRuntimeConfig(window.__NETBIRD_RUNTIME_CONFIG__);
+  }
+
+  if (process.env.APP_ENV === "test" || process.env.NODE_ENV === "development") {
+    return setRuntimeConfig(getBundledConfig());
+  }
+
+  throw new Error(
+    "Runtime config has not been initialized yet. Make sure RuntimeConfigProvider loads before rendering the app.",
+  );
 };
 
 /**

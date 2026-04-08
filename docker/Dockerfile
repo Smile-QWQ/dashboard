@@ -13,6 +13,7 @@ WORKDIR /usr/share/nginx/html
 # copy configuration files
 COPY docker/default.conf /etc/nginx/http.d/default.conf
 COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/config.json.tmpl /app/docker/config.json.tmpl
 COPY docker/init_cert.sh /usr/local/init_cert.sh
 COPY docker/init_react_envs.sh /usr/local/init_react_envs.sh
 RUN chmod +x /usr/local/init_cert.sh && rm /etc/crontabs/root

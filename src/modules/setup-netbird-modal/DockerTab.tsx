@@ -4,7 +4,7 @@ import InlineLink from "@components/InlineLink";
 import Steps from "@components/Steps";
 import TabsContentPadding, { TabsContent } from "@components/Tabs";
 import { IconBrandUbuntu } from "@tabler/icons-react";
-import { GRPC_API_ORIGIN } from "@utils/netbird";
+import { getGrpcApiOrigin } from "@utils/netbird";
 import { ExternalLinkIcon } from "lucide-react";
 import Link from "next/link";
 import React from "react";
@@ -22,6 +22,7 @@ export default function DockerTab({
   showSetupKeyInfo = false,
   hostname,
 }: Readonly<Props>) {
+  const grpcApiOrigin = getGrpcApiOrigin();
   return (
     <TabsContent value={String(OperatingSystem.DOCKER)}>
       <TabsContentPadding>
@@ -71,11 +72,11 @@ export default function DockerTab({
               )}
 
               <Code.Line> -v netbird-client:/var/lib/netbird \</Code.Line>
-              {GRPC_API_ORIGIN && (
+              {grpcApiOrigin && (
                 <Code.Line>
                   {" "}
                   -e NB_MANAGEMENT_URL=
-                  <span className={"text-netbird"}>{GRPC_API_ORIGIN}</span> \
+                  <span className={"text-netbird"}>{grpcApiOrigin}</span> \
                 </Code.Line>
               )}
               <Code.Line> netbirdio/netbird:latest</Code.Line>

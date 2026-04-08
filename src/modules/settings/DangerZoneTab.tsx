@@ -4,7 +4,6 @@ import Card from "@components/Card";
 import { notify } from "@components/Notification";
 import * as Tabs from "@radix-ui/react-tabs";
 import { useApiCall } from "@utils/api";
-import loadConfig from "@utils/config";
 import { AlertOctagonIcon } from "lucide-react";
 import React from "react";
 import SettingsIcon from "@/assets/icons/SettingsIcon";
@@ -15,7 +14,6 @@ import { Account } from "@/interfaces/Account";
 type Props = {
   account: Account;
 };
-const config = loadConfig();
 
 export default function DangerZoneTab({ account }: Props) {
   const { confirm } = useDialog();

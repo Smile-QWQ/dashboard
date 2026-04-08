@@ -3,7 +3,7 @@ import Code from "@components/Code";
 import { SelectDropdown } from "@components/select/SelectDropdown";
 import Steps from "@components/Steps";
 import TabsContentPadding, { TabsContent } from "@components/Tabs";
-import { getNetBirdUpCommand, GRPC_API_ORIGIN } from "@utils/netbird";
+import { getGrpcApiOrigin, getNetBirdUpCommand } from "@utils/netbird";
 import { DownloadIcon, PackageOpenIcon } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
@@ -25,6 +25,7 @@ export default function WindowsTab({
   showSetupKeyInfo,
   hostname,
 }: Readonly<Props>) {
+  const grpcApiOrigin = getGrpcApiOrigin();
   const [windowsUrl, setWindowsUrl] = useState(
     "https://pkgs.netbird.io/windows/x64",
   );
@@ -77,19 +78,19 @@ export default function WindowsTab({
             </div>
           </Steps.Step>
 
-          {GRPC_API_ORIGIN && (
+          {grpcApiOrigin && (
             <Steps.Step step={2}>
               <p>
                 {`Click on "Settings" then "Advanced Settings" from the NetBird icon in your system tray and enter the following "Management URL"`}
               </p>
               <Code>
-                <Code.Line>{GRPC_API_ORIGIN}</Code.Line>
+                <Code.Line>{grpcApiOrigin}</Code.Line>
               </Code>
             </Steps.Step>
           )}
 
           {setupKey ? (
-            <Steps.Step step={GRPC_API_ORIGIN ? 3 : 2} line={false}>
+            <Steps.Step step={grpcApiOrigin ? 3 : 2} line={false}>
               <p>
                 Open Command-line and run NetBird{" "}
                 {showSetupKeyInfo && <RoutingPeerSetupKeyInfo />}
@@ -105,13 +106,13 @@ export default function WindowsTab({
             </Steps.Step>
           ) : (
             <>
-              <Steps.Step step={GRPC_API_ORIGIN ? 3 : 2}>
+              <Steps.Step step={grpcApiOrigin ? 3 : 2}>
                 <p>
                   {/* eslint-disable-next-line react/no-unescaped-entities */}
                   Click on "Connect" from the NetBird icon in your system tray
                 </p>
               </Steps.Step>
-              <Steps.Step step={GRPC_API_ORIGIN ? 4 : 3} line={false}>
+              <Steps.Step step={grpcApiOrigin ? 4 : 3} line={false}>
                 <p>Sign up using your email address</p>
               </Steps.Step>
             </>

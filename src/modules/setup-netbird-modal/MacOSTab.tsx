@@ -11,7 +11,7 @@ import Separator from "@components/Separator";
 import Steps from "@components/Steps";
 import TabsContentPadding, { TabsContent } from "@components/Tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@components/Tooltip";
-import { getNetBirdUpCommand, GRPC_API_ORIGIN } from "@utils/netbird";
+import { getGrpcApiOrigin, getNetBirdUpCommand } from "@utils/netbird";
 import {
   BeerIcon,
   DownloadIcon,
@@ -39,6 +39,7 @@ export default function MacOSTab({
   showSetupKeyInfo,
   hostname,
 }: Readonly<Props>) {
+  const grpcApiOrigin = getGrpcApiOrigin();
   return (
     <TabsContent value={String(OperatingSystem.APPLE)}>
       <TabsContentPadding>
@@ -91,19 +92,19 @@ export default function MacOSTab({
             </div>
           </Steps.Step>
 
-          {GRPC_API_ORIGIN && (
+          {grpcApiOrigin && (
             <Steps.Step step={2}>
               <p>
                 {`Click on "Settings" then "Advanced Settings" from the NetBird icon in your system tray and enter the following "Management URL"`}
               </p>
               <Code>
-                <Code.Line>{GRPC_API_ORIGIN}</Code.Line>
+                <Code.Line>{grpcApiOrigin}</Code.Line>
               </Code>
             </Steps.Step>
           )}
 
           {setupKey ? (
-            <Steps.Step step={GRPC_API_ORIGIN ? 3 : 2} line={false}>
+            <Steps.Step step={grpcApiOrigin ? 3 : 2} line={false}>
               <p>
                 Open Terminal and run NetBird{" "}
                 {showSetupKeyInfo && <RoutingPeerSetupKeyInfo />}
@@ -119,13 +120,13 @@ export default function MacOSTab({
             </Steps.Step>
           ) : (
             <>
-              <Steps.Step step={GRPC_API_ORIGIN ? 3 : 2}>
+              <Steps.Step step={grpcApiOrigin ? 3 : 2}>
                 <p>
                   {/* eslint-disable-next-line react/no-unescaped-entities */}
                   Click on "Connect" from the NetBird icon in your system tray
                 </p>
               </Steps.Step>
-              <Steps.Step step={GRPC_API_ORIGIN ? 4 : 3} line={false}>
+              <Steps.Step step={grpcApiOrigin ? 4 : 3} line={false}>
                 <p>Sign up using your email address</p>
               </Steps.Step>
             </>

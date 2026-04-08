@@ -2,13 +2,12 @@ import loadConfig from "@utils/config";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-const config = loadConfig();
-
 export const useRedirect = (
   url: string,
   replace: boolean = false,
   enable: boolean = true,
 ) => {
+  const config = loadConfig();
   const router = useRouter();
   const currentPath = usePathname();
   const callBackUrls = useRef([config.redirectURI, config.silentRedirectURI]);
