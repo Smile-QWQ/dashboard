@@ -4,13 +4,15 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: static-release-${{ github.ref }}
+  group: static-release-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -26,6 +28,29 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
+      - name: Prepare release metadata
+        id: meta
+        shell: bash
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            version="${GITHUB_REF#refs/tags/}"
+            tag_name="${GITHUB_REF#refs/tags/}"
+          else
+            timestamp="$(date -u +'%Y%m%d-%H%M%S')"
+            version="${timestamp}-${short_sha}"
+            tag_name="static-${version}"
+          fi
+
+          archive_name="dashboard-static-${version}.tar.gz"
+          checksum_name="${archive_name}.sha256"
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "archive_name=${archive_name}" >> "$GITHUB_OUTPUT"
+          echo "checksum_name=${checksum_name}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         run: npm ci
@@ -59,22 +84,8 @@ jobs:
 
       - name: Build static files
         run: npm run build
-
-      - name: Prepare release metadata
-        id: meta
-        shell: bash
-        run: |
-          short_sha="${GITHUB_SHA::7}"
-          timestamp="$(date -u +'%Y%m%d-%H%M%S')"
-          version="${timestamp}-${short_sha}"
-          archive_name="dashboard-static-${version}.tar.gz"
-          checksum_name="${archive_name}.sha256"
-          tag_name="static-${version}"
-
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "archive_name=${archive_name}" >> "$GITHUB_OUTPUT"
-          echo "checksum_name=${checksum_name}" >> "$GITHUB_OUTPUT"
-          echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+        env:
+          NEXT_PUBLIC_DASHBOARD_VERSION: ${{ steps.meta.outputs.version }}
 
       - name: Archive static files
         shell: bash
@@ -99,6 +110,7 @@ jobs:
             ${{ steps.meta.outputs.checksum_name }}
           name: Dashboard Static ${{ steps.meta.outputs.version }}
           tag_name: ${{ steps.meta.outputs.tag_name }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
           body: |
             Automated static build for commit `${{ github.sha }}`.
 
@@ -108,6 +120,6 @@ jobs:
             - production-ready directory-style routes
             - sha256 checksum file
           generate_release_notes: true
-          make_latest: true
+          make_latest: ${{ startsWith(github.ref, 'refs/tags/') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
