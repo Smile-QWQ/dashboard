@@ -12,6 +12,7 @@ env:
 
 jobs:
   build_n_push:
+    if: github.repository == 'netbirdio/dashboard'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
