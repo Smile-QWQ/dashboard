@@ -14,5 +14,16 @@
   "hotjarTrackID": "",
   "googleAnalyticsID": "",
   "googleTagManagerID": "",
-  "wasmPath": ""
+  "authServiceUrl": "",
+  "wasmPath": "",
+  "licensed": false,
+  "cloud": false,
+  "agentNetworkOnly": false,
+  "agentNetworkEnabled": false,
+  "hubspotPortalId": "",
+  "hubspotSignupFormId": "",
+  "hubspotOnboardingFormId": "",
+  "hubspotSurveyFormId": "",
+  "analyticsExcludedEmails": "",
+  "announcement": ""
 }

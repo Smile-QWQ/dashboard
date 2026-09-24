@@ -2,12 +2,27 @@ import Button from "@components/Button";
 import Card from "@components/Card";
 import { DataTable } from "@components/table/DataTable";
 import DataTableHeader from "@components/table/DataTableHeader";
-import { DataTableRowsPerPage } from "@components/table/DataTableRowsPerPage";
+import DataTableResetFilterButton from "@components/table/DataTableResetFilterButton";
+import {
+  ENABLED_COLUMN_ID,
+  fadeDisabledRowCells,
+} from "@components/table/disabledRowCells";
+import { ENABLED_COLUMN_CLASS } from "@components/table/enabledColumnClass";
+import {
+  formatRadioChip,
+  RadioOption,
+  RadioPicker,
+} from "@components/table/filters/RadioPicker";
+import {
+  TableFilterChips,
+  TableFilterDef,
+  TableFiltersButton,
+} from "@components/table/TableFilters";
 import NoResults from "@components/ui/NoResults";
-import { IconCirclePlus } from "@tabler/icons-react";
 import { ColumnDef, SortingState } from "@tanstack/react-table";
+import { PlusCircle } from "lucide-react";
 import * as React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import PeerIcon from "@/assets/icons/PeerIcon";
 import { usePermissions } from "@/contexts/PermissionsProvider";
 import { NetworkRouter } from "@/interfaces/Network";
@@ -35,10 +50,16 @@ const NetworkRouterColumns: ColumnDef<NetworkRouter>[] = [
     cell: ({ row }) => <NetworkRoutingPeerName router={row.original} />,
   },
   {
-    id: "enabled",
+    id: ENABLED_COLUMN_ID,
     accessorKey: "enabled",
+    enableSorting: false,
+    meta: { className: ENABLED_COLUMN_CLASS.xl },
     header: ({ column }) => {
-      return <DataTableHeader column={column}>Active</DataTableHeader>;
+      return (
+        <DataTableHeader column={column} sorting={false}>
+          Active
+        </DataTableHeader>
+      );
     },
     cell: ({ row }) => <RoutingPeersEnabledCell router={row.original} />,
   },
@@ -91,6 +112,35 @@ export default function NetworkRoutingPeersTable({
     },
   ]);
 
+  const statusOptions = useMemo<RadioOption<boolean | undefined>[]>(
+    () => [
+      { value: undefined, label: "All", dotClass: "bg-nb-gray-500" },
+      { value: true, label: "Active", dotClass: "bg-green-500" },
+      { value: false, label: "Inactive", dotClass: "bg-nb-gray-700" },
+    ],
+    [],
+  );
+
+  const filterDefs = useMemo<TableFilterDef[]>(
+    () => [
+      {
+        id: "enabled",
+        label: "Status",
+        renderPicker: (p) => (
+          <RadioPicker
+            value={p.value as boolean | undefined}
+            onChange={p.onChange}
+            close={p.close}
+            options={statusOptions}
+          />
+        ),
+        formatChip: (v) =>
+          formatRadioChip(v as boolean | undefined, statusOptions),
+      },
+    ],
+    [statusOptions],
+  );
+
   return (
     <DataTable
       wrapperComponent={Card}
@@ -105,6 +155,11 @@ export default function NetworkRoutingPeersTable({
       text={"Routing Peers"}
       columns={NetworkRouterColumns}
       keepStateInLocalStorage={false}
+      initialPageSize={25}
+      showResetFilterButton={false}
+      aboveTable={(table) => (
+        <TableFilterChips table={table} filters={filterDefs} />
+      )}
       data={routers}
       searchPlaceholder={"Search by peer name, group name..."}
       isLoading={isLoading}
@@ -119,24 +174,36 @@ export default function NetworkRoutingPeersTable({
         />
       }
       columnVisibility={{ search: false }}
+      cellClassName={fadeDisabledRowCells}
       paginationPaddingClassName={"px-0 pt-8"}
       rightSide={() => (
         <Button
           variant={"primary"}
-          className={"ml-auto"}
+          className={"ml-auto mr-4"}
           onClick={() => network && openAddRoutingPeerModal(network)}
           disabled={!permission.networks.update}
         >
-          <IconCirclePlus size={16} />
-          Add Routing Peer
+          <PlusCircle size={16} />
+          Add
         </Button>
       )}
     >
       {(table) => (
-        <DataTableRowsPerPage
-          table={table}
-          disabled={!routers || routers?.length == 0}
-        />
+        <>
+          <TableFiltersButton
+            table={table}
+            filters={filterDefs}
+            disabled={!routers || routers?.length == 0}
+          />
+          <DataTableResetFilterButton
+            table={table}
+            onClick={() => {
+              table.setPageIndex(0);
+              table.resetColumnFilters();
+              table.resetGlobalFilter();
+            }}
+          />
+        </>
       )}
     </DataTable>
   );

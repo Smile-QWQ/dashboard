@@ -17,7 +17,18 @@ type RawConfig = {
   hotjarTrackID?: number | string;
   googleAnalyticsID?: string;
   googleTagManagerID?: string;
+  authServiceUrl?: string;
   wasmPath?: string;
+  licensed?: boolean | string;
+  cloud?: boolean | string;
+  agentNetworkOnly?: boolean | string;
+  agentNetworkEnabled?: boolean | string;
+  hubspotPortalId?: string;
+  hubspotSignupFormId?: string;
+  hubspotOnboardingFormId?: string;
+  hubspotSurveyFormId?: string;
+  analyticsExcludedEmails?: string | string[];
+  announcement?: string;
 };
 
 export interface Config {
@@ -36,17 +47,35 @@ export interface Config {
   hotjarTrackID?: number;
   googleAnalyticsID?: string;
   googleTagManagerID?: string;
+  authServiceUrl?: string;
   wasmPath: string;
+  licensed: boolean;
+  cloud: boolean;
+  // agentNetworkOnly: dedicated Agent Network surface — the regular UI
+  // (network routing, DNS, reverse proxy, activity) is hidden, no Beta badge.
+  // agentNetworkEnabled: the regular UI plus the Agent Network menu item (Beta).
+  agentNetworkOnly: boolean;
+  agentNetworkEnabled: boolean;
+  hubspotPortalId?: string;
+  hubspotSignupFormId?: string;
+  hubspotOnboardingFormId?: string;
+  hubspotSurveyFormId?: string;
+  analyticsExcludedEmails: string[];
+  // announcement: text the operator wants every user of this deployment to
+  // see in a permanent banner (NETBIRD_ANNOUNCEMENT), e.g. which environment
+  // or backend instance a dashboard belongs to. Unset for none.
+  announcement?: string;
 }
 
 const DEFAULT_REDIRECT_URI = "/auth";
 const DEFAULT_SILENT_REDIRECT_URI = "/silent-auth";
 const DEFAULT_TOKEN_SOURCE = "accessToken";
 const DEFAULT_DRAG_QUERY_PARAMS = false;
-const DEFAULT_WASM_PATH = "https://pkgs.netbird.io/wasm/client/v0.63.0";
+const DEFAULT_WASM_PATH = "https://pkgs.netbird.io/wasm/client/v0.76.3";
 const RUNTIME_CONFIG_URL = "/config.json";
 
 let cachedConfig: Config | null = null;
+let configProxy: Config | null = null;
 
 declare global {
   interface Window {
@@ -60,22 +89,35 @@ const isPlaceholderValue = (value: unknown) => {
 
 const parseBoolean = (value: unknown) => {
   if (typeof value === "boolean") return value;
+  if (value === undefined || value === null) return false;
+  if (isPlaceholderValue(value)) return false;
   return String(value).toLowerCase() === "true";
 };
 
 const parseOptionalString = (value: unknown) => {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
-  return trimmed === "" ? undefined : trimmed;
+  if (trimmed === "" || isPlaceholderValue(trimmed)) return undefined;
+  return trimmed;
 };
 
 const parseOptionalNumber = (value: unknown) => {
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
-  if (typeof value !== "string") return undefined;
+  if (typeof value !== "string" || isPlaceholderValue(value)) return undefined;
   const trimmed = value.trim();
   if (trimmed === "") return undefined;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const parseEmailList = (value: unknown) => {
+  const source = Array.isArray(value) ? value.join(",") : value;
+  const raw = parseOptionalString(source);
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
 };
 
 const normalizeConfig = (configJson: RawConfig): Config => {
@@ -111,7 +153,20 @@ const normalizeConfig = (configJson: RawConfig): Config => {
     hotjarTrackID: parseOptionalNumber(configJson.hotjarTrackID),
     googleAnalyticsID: parseOptionalString(configJson.googleAnalyticsID),
     googleTagManagerID: parseOptionalString(configJson.googleTagManagerID),
+    authServiceUrl: parseOptionalString(configJson.authServiceUrl),
     wasmPath: parseOptionalString(configJson.wasmPath) || DEFAULT_WASM_PATH,
+    licensed: parseBoolean(configJson.licensed),
+    cloud: parseBoolean(configJson.cloud),
+    agentNetworkOnly: parseBoolean(configJson.agentNetworkOnly),
+    agentNetworkEnabled: parseBoolean(configJson.agentNetworkEnabled),
+    hubspotPortalId: parseOptionalString(configJson.hubspotPortalId),
+    hubspotSignupFormId: parseOptionalString(configJson.hubspotSignupFormId),
+    hubspotOnboardingFormId: parseOptionalString(
+      configJson.hubspotOnboardingFormId,
+    ),
+    hubspotSurveyFormId: parseOptionalString(configJson.hubspotSurveyFormId),
+    analyticsExcludedEmails: parseEmailList(configJson.analyticsExcludedEmails),
+    announcement: parseOptionalString(configJson.announcement),
   };
 };
 
@@ -135,7 +190,65 @@ const getConfigValidationErrors = (configJson: RawConfig) => {
 };
 
 const getBundledConfig = (): RawConfig => {
+  if (process.env.APP_ENV === "test") {
+    return require("@/config/test");
+  }
+  if (process.env.NODE_ENV === "development") {
+    return require("@/config/local");
+  }
   return require("../../config.json");
+};
+
+const canUseBundledConfig = () => {
+  return (
+    process.env.APP_ENV === "test" || process.env.NODE_ENV === "development"
+  );
+};
+
+const readWindowConfig = () => {
+  if (typeof window === "undefined") return undefined;
+  return window.__NETBIRD_RUNTIME_CONFIG__;
+};
+
+const hydrateConfig = () => {
+  if (cachedConfig) return cachedConfig;
+
+  const windowConfig = readWindowConfig();
+  if (windowConfig) return setRuntimeConfig(windowConfig);
+  if (canUseBundledConfig()) return setRuntimeConfig(getBundledConfig());
+  return null;
+};
+
+const resolveConfig = () => {
+  const config = hydrateConfig();
+  if (config) return config;
+  throw new Error(
+    "Runtime config has not been initialized yet. Make sure RuntimeConfigProvider loads before rendering the app.",
+  );
+};
+
+// Module-scope `const config = loadConfig()` is evaluated before /config.json
+// is fetched. A proxy defers every property read until render time.
+const getConfigProxy = (): Config => {
+  if (configProxy) return configProxy;
+
+  configProxy = new Proxy({} as Config, {
+    get(_target, prop, receiver) {
+      const current = resolveConfig();
+      const value = Reflect.get(current, prop, receiver);
+      return typeof value === "function" ? value.bind(current) : value;
+    },
+    ownKeys() {
+      return Reflect.ownKeys(resolveConfig());
+    },
+    getOwnPropertyDescriptor(_target, prop) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(resolveConfig(), prop);
+      if (!descriptor) return undefined;
+      return { ...descriptor, configurable: true };
+    },
+  });
+
+  return configProxy;
 };
 
 export const setRuntimeConfig = (configJson: RawConfig) => {
@@ -151,10 +264,7 @@ export const setRuntimeConfig = (configJson: RawConfig) => {
 export const initializeRuntimeConfig = async () => {
   if (cachedConfig) return cachedConfig;
 
-  if (
-    process.env.APP_ENV === "test" ||
-    process.env.NODE_ENV === "development"
-  ) {
+  if (canUseBundledConfig()) {
     return setRuntimeConfig(getBundledConfig());
   }
 
@@ -184,27 +294,8 @@ export const initializeRuntimeConfig = async () => {
  * Load the config from the current runtime source.
  */
 const loadConfig = (): Config => {
-  if (cachedConfig) {
-    return cachedConfig;
-  }
-
-  if (
-    typeof window !== "undefined" &&
-    window.__NETBIRD_RUNTIME_CONFIG__ !== undefined
-  ) {
-    return setRuntimeConfig(window.__NETBIRD_RUNTIME_CONFIG__);
-  }
-
-  if (
-    process.env.APP_ENV === "test" ||
-    process.env.NODE_ENV === "development"
-  ) {
-    return setRuntimeConfig(getBundledConfig());
-  }
-
-  throw new Error(
-    "Runtime config has not been initialized yet. Make sure RuntimeConfigProvider loads before rendering the app.",
-  );
+  hydrateConfig();
+  return getConfigProxy();
 };
 
 /**

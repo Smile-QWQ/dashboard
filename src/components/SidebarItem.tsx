@@ -2,9 +2,10 @@
 
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { cn } from "@utils/helpers";
+import { useGuardedRouter } from "@utils/navigation-guard";
 import classNames from "classnames";
 import { ChevronDownIcon, ChevronUpIcon, DotIcon } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import React, { useEffect, useMemo } from "react";
 import { useApplicationContext } from "@/contexts/ApplicationProvider";
 
@@ -38,11 +39,31 @@ export default function SidebarItem({
 }: Readonly<SidebarItemProps>) {
   const path = usePathname();
 
+  // Hrefs of nested child items, so a collapsible parent without its
+  // own href (e.g. "Network Routing") can still tell when one of its
+  // children matches the current route.
+  const childRoutes = useMemo(() => {
+    const routes: { href: string; exact: boolean }[] = [];
+    React.Children.forEach(children, (child) => {
+      if (!React.isValidElement(child)) return;
+      const props = child.props as Partial<SidebarItemProps>;
+      if (props.href) {
+        routes.push({ href: props.href, exact: !!props.exactPathMatch });
+      }
+    });
+    return routes;
+  }, [children]);
+
   // Check if any child route is active (for collapsible items)
   const hasActiveChild = useMemo(() => {
-    if (!collapsible || !href) return false;
-    return path === href || path.startsWith(href + "/");
-  }, [collapsible, href, path]);
+    if (!collapsible) return false;
+    if (href && (path === href || path.startsWith(href + "/"))) return true;
+    return childRoutes.some(({ href: childHref, exact }) =>
+      exact
+        ? path === childHref
+        : path === childHref || path.startsWith(childHref + "/"),
+    );
+  }, [collapsible, href, path, childRoutes]);
 
   const [open, setOpen] = React.useState(hasActiveChild);
 
@@ -52,7 +73,7 @@ export default function SidebarItem({
       setOpen(true);
     }
   }, [hasActiveChild]);
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { mobileNavOpen, toggleMobileNav, isNavigationCollapsed } =
     useApplicationContext();
 
@@ -79,7 +100,11 @@ export default function SidebarItem({
   if (!visible) return;
 
   return (
-    <Collapsible.Root open={open} onOpenChange={setOpen}>
+    <Collapsible.Root
+      open={open}
+      onOpenChange={setOpen}
+      data-nav-item={href || undefined}
+    >
       <Collapsible.Trigger asChild>
         <li className={"px-3 cursor-pointer list-none"}>
           <button
@@ -94,7 +119,7 @@ export default function SidebarItem({
                 : "text-gray-600 hover:bg-gray-200 dark:text-nb-gray-400 dark:hover:bg-nb-gray-900/50",
             )}
             onClick={handleClick}
-            data-cy={"left-navigation-item"}
+            data-testid={"left-navigation-item"}
           >
             {isChild && isNavigationCollapsed && !mobileNavOpen && (
               <div

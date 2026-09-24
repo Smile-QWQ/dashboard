@@ -31,7 +31,7 @@ type ServiceModeConfig = {
 
 export const SERVICE_MODES: Record<ServiceMode, ServiceModeConfig> = {
   [ServiceMode.HTTP]: {
-    label: "HTTP/S Service",
+    label: "HTTPS Service",
     description:
       "Reverse proxy with path routing and built-in authentication (SSO, PIN, password). Typically used for web applications and APIs.",
     icon: <Globe size={14} />,
@@ -64,7 +64,7 @@ export const ReverseProxyServiceModeSelector = ({
 }: Props) => {
   const selected = value ?? ServiceMode.HTTP;
   const selectedMode = SERVICE_MODES[selected];
-  const isL4Supported = domain?.supports_custom_ports === true;
+  const isL4Supported = domain?.supports_custom_ports !== undefined;
 
   // Reset to HTTP if the current L4 mode becomes unsupported (e.g. domain changed)
   useEffect(() => {
@@ -90,13 +90,13 @@ export const ReverseProxyServiceModeSelector = ({
         <SelectTrigger className="max-w-[240px] min-w-[200px]">
           <div
             className={"flex items-center gap-2 whitespace-nowrap"}
-            data-cy={"service-mode-select-button"}
+            data-testid={"service-mode-select-button"}
           >
             {selectedMode.icon}
             <SelectValue placeholder="Select type..." />
           </div>
         </SelectTrigger>
-        <SelectContent data-cy={"service-mode-selection"}>
+        <SelectContent data-testid={"service-mode-selection"}>
           {Object.entries(SERVICE_MODES)
             .filter(
               ([mode]) =>
@@ -106,6 +106,7 @@ export const ReverseProxyServiceModeSelector = ({
               <SelectItem
                 key={mode}
                 value={mode}
+                data-testid={`service-mode-option-${mode}`}
                 extra={
                   <HelpTooltip
                     triggerClassName={"ml-[0.01rem]"}

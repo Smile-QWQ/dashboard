@@ -9,7 +9,7 @@ import Code from "@components/Code";
 import Separator from "@components/Separator";
 import Steps from "@components/Steps";
 import TabsContentPadding, { TabsContent } from "@components/Tabs";
-import { getGrpcApiOrigin, getNetBirdUpCommand } from "@utils/netbird";
+import { getGrpcApiOrigin, pkgsDownloadUrl } from "@utils/netbird";
 import {
   BeerIcon,
   DownloadIcon,
@@ -21,24 +21,34 @@ import Link from "next/link";
 import React from "react";
 import { OperatingSystem } from "@/interfaces/OperatingSystem";
 import {
-  HostnameParameter,
+  ManagementUrlStep,
+  NetBirdUpCommand,
   RoutingPeerSetupKeyInfo,
-  SetupKeyParameter,
 } from "@/modules/setup-netbird-modal/SetupModal";
 
 type Props = {
   setupKey?: string;
+  setupKeyContent?: React.ReactNode;
+  setupKeyPlaceholder?: string;
   showSetupKeyInfo?: boolean;
   hostname?: string;
 };
-
 export default function MacOSTab({
   setupKey,
+  setupKeyContent,
+  setupKeyPlaceholder,
   showSetupKeyInfo,
   hostname,
 }: Readonly<Props>) {
+  // Mirrors WindowsTab: server flow (setupKeyContent present) forces
+  // the CLI run branch so the netbird up command stays visible while
+  // the operator generates a key.
   const grpcApiOrigin = getGrpcApiOrigin();
-
+  const useCliRun = !!setupKey || !!setupKeyContent;
+  const baseMgmtStep = 2;
+  const keyStep = grpcApiOrigin ? 3 : 2;
+  const runStep = keyStep + (setupKeyContent ? 1 : 0);
+  const usingSetupKeyParam = !!setupKey || !!setupKeyPlaceholder;
   return (
     <TabsContent value={String(OperatingSystem.APPLE)}>
       <TabsContentPadding>
@@ -53,7 +63,7 @@ export default function MacOSTab({
             </div>
             <div className={"flex gap-4 mt-1 flex-wrap"}>
               <Link
-                href={"https://pkgs.netbird.io/macos/universal"}
+                href={pkgsDownloadUrl("macos/universal")}
                 passHref
                 target={"_blank"}
               >
@@ -66,40 +76,37 @@ export default function MacOSTab({
           </Steps.Step>
 
           {grpcApiOrigin && (
-            <Steps.Step step={2}>
-              <p>
-                {`Click on "Settings" then "Advanced Settings" from the NetBird icon in your system tray and enter the following "Management URL"`}
-              </p>
-              <Code>
-                <Code.Line>{grpcApiOrigin}</Code.Line>
-              </Code>
+            <Steps.Step step={baseMgmtStep}>
+              <ManagementUrlStep trayName={"menu bar"} />
             </Steps.Step>
           )}
 
-          {setupKey ? (
-            <Steps.Step step={grpcApiOrigin ? 3 : 2} line={false}>
+          {setupKeyContent && (
+            <Steps.Step step={keyStep}>{setupKeyContent}</Steps.Step>
+          )}
+
+          {useCliRun ? (
+            <Steps.Step step={runStep} line={false}>
               <p>
                 Open Terminal and run NetBird{" "}
                 {showSetupKeyInfo && <RoutingPeerSetupKeyInfo />}
               </p>
 
-              <Code>
-                <Code.Line>
-                  {getNetBirdUpCommand()}
-                  <SetupKeyParameter setupKey={setupKey} />
-                  <HostnameParameter hostname={hostname} />
-                </Code.Line>
-              </Code>
+              <NetBirdUpCommand
+                setupKey={setupKey}
+                setupKeyPlaceholder={setupKeyPlaceholder}
+                hostname={hostname}
+              />
             </Steps.Step>
           ) : (
             <>
-              <Steps.Step step={grpcApiOrigin ? 3 : 2}>
+              <Steps.Step step={runStep}>
                 <p>
                   {/* eslint-disable-next-line react/no-unescaped-entities */}
-                  Click on "Connect" from the NetBird icon in your system tray
+                  Click on "Connect" from the NetBird icon in your menu bar
                 </p>
               </Steps.Step>
-              <Steps.Step step={grpcApiOrigin ? 4 : 3} line={false}>
+              <Steps.Step step={runStep + 1} line={false}>
                 <p>Sign up using your email address</p>
               </Steps.Step>
             </>
@@ -123,16 +130,14 @@ export default function MacOSTab({
                 </Steps.Step>
                 <Steps.Step step={2} line={false}>
                   <p>
-                    Run NetBird {!setupKey && "and log in the browser"}
+                    Run NetBird {!usingSetupKeyParam && "and log in the browser"}
                     {showSetupKeyInfo && <RoutingPeerSetupKeyInfo />}
                   </p>
-                  <Code>
-                    <Code.Line>
-                      {getNetBirdUpCommand()}
-                      <SetupKeyParameter setupKey={setupKey} />
-                      <HostnameParameter hostname={hostname} />
-                    </Code.Line>
-                  </Code>
+                  <NetBirdUpCommand
+                    setupKey={setupKey}
+                    setupKeyPlaceholder={setupKeyPlaceholder}
+                    hostname={hostname}
+                  />
                 </Steps.Step>
               </Steps>
             </AccordionContent>
@@ -184,16 +189,14 @@ export default function MacOSTab({
                 </Steps.Step>
                 <Steps.Step step={4} line={false}>
                   <p>
-                    Run NetBird {!setupKey && "and log in the browser"}
+                    Run NetBird {!usingSetupKeyParam && "and log in the browser"}
                     {showSetupKeyInfo && <RoutingPeerSetupKeyInfo />}
                   </p>
-                  <Code>
-                    <Code.Line>
-                      {getNetBirdUpCommand()}
-                      <SetupKeyParameter setupKey={setupKey} />
-                      <HostnameParameter hostname={hostname} />
-                    </Code.Line>
-                  </Code>
+                  <NetBirdUpCommand
+                    setupKey={setupKey}
+                    setupKeyPlaceholder={setupKeyPlaceholder}
+                    hostname={hostname}
+                  />
                 </Steps.Step>
               </Steps>
             </AccordionContent>

@@ -9,6 +9,7 @@ import Badge from "@components/Badge";
 import FullTooltip from "@components/FullTooltip";
 import InlineLink from "@components/InlineLink";
 import { CircleAlert, Loader2 } from "lucide-react";
+import * as React from "react";
 import { useRef } from "react";
 
 type Props = {
@@ -16,6 +17,11 @@ type Props = {
   meta?: ReverseProxyMeta;
   enabled?: boolean;
   isL4?: boolean;
+  compact?: boolean;
+  // Rendered when the service is fully active (no setup/cert/error badge to
+  // show). Lets callers swap in another piece of UI (e.g. the cluster badge)
+  // in the same slot once the cell would otherwise be empty.
+  readyFallback?: React.ReactNode;
 };
 
 const POLL_INTERVAL_MS = 3500;
@@ -25,6 +31,8 @@ export default function ReverseProxyStatusCell({
   meta,
   enabled,
   isL4,
+  compact,
+  readyFallback,
 }: Readonly<Props>) {
   const dataRef = useRef<ReverseProxy | undefined>(undefined);
 
@@ -56,94 +64,128 @@ export default function ReverseProxyStatusCell({
 
   dataRef.current = data;
 
-  if (!enabled) return null;
+  if (!enabled) return <>{readyFallback ?? null}</>;
 
   // L4 services don't need certificates
   if (isL4) {
-    if (isActive) return null;
+    if (isActive) return <>{readyFallback ?? null}</>;
     if (hasError) {
       return (
-        <FullTooltip
-          content={
-            <div className={"text-xs max-w-xs"}>
-              Something went wrong while setting up this service. See our{" "}
-              <InlineLink
-                href={REVERSE_PROXY_TROUBLESHOOTING_DOCS_LINK}
-                target={"_blank"}
-              >
-                Troubleshooting Docs
-              </InlineLink>{" "}
-              for more details.
+        <div className={"flex"} data-status-cell>
+          <FullTooltip
+            content={
+              <div className={"text-xs max-w-xs"}>
+                Something went wrong while setting up this service. See our{" "}
+                <InlineLink
+                  href={REVERSE_PROXY_TROUBLESHOOTING_DOCS_LINK}
+                  target={"_blank"}
+                >
+                  Troubleshooting Docs
+                </InlineLink>{" "}
+                for more details.
+              </div>
+            }
+            align={"center"}
+            alignOffset={0}
+          >
+            <div className={"flex"}>
+              {compact ? (
+                <span className={"text-red-400 cursor-help truncate"}>
+                  Error
+                </span>
+              ) : (
+                <Badge variant={"red"}>
+                  <CircleAlert size={11} />
+                  Error
+                </Badge>
+              )}
             </div>
-          }
-          align={"center"}
-          alignOffset={0}
-        >
-          <div className={"flex"}>
-            <Badge variant={"red"}>
-              <CircleAlert size={11} />
-              Error
-            </Badge>
-          </div>
-        </FullTooltip>
+          </FullTooltip>
+        </div>
       );
     }
     if (isTunnelNotCreated) {
       return (
-        <FullTooltip
-          content={
-            <div className={"text-xs max-w-xs"}>
-              The tunnel to the target peer could not be established. See our{" "}
-              <InlineLink
-                href={REVERSE_PROXY_TROUBLESHOOTING_DOCS_LINK}
-                target={"_blank"}
-              >
-                Troubleshooting Docs
-              </InlineLink>{" "}
-              for more details.
+        <div className={"flex"} data-status-cell>
+          <FullTooltip
+            content={
+              <div className={"text-xs max-w-xs"}>
+                The tunnel to the target peer could not be established. See our{" "}
+                <InlineLink
+                  href={REVERSE_PROXY_TROUBLESHOOTING_DOCS_LINK}
+                  target={"_blank"}
+                >
+                  Troubleshooting Docs
+                </InlineLink>{" "}
+                for more details.
+              </div>
+            }
+            align={"center"}
+            alignOffset={0}
+          >
+            <div className={"flex"}>
+              {compact ? (
+                <span className={"text-red-400 cursor-help truncate"}>
+                  Tunnel not created
+                </span>
+              ) : (
+                <Badge variant={"red"}>
+                  <CircleAlert size={11} />
+                  Tunnel not created
+                </Badge>
+              )}
             </div>
-          }
-          align={"center"}
-          alignOffset={0}
-        >
-          <div className={"flex"}>
-            <Badge variant={"red"}>
-              <CircleAlert size={11} />
-              Tunnel not created
-            </Badge>
-          </div>
-        </FullTooltip>
+          </FullTooltip>
+        </div>
       );
     }
-    return <SettingUpService />;
+    return <SettingUpService compact={compact} />;
   }
 
   // HTTP services: hide once active with certificate issued
   if (isActive && certificateIssued) {
-    return null;
+    return <>{readyFallback ?? <div data-status-cell />}</>;
   }
 
   if (!certificateIssued) {
     return (
-      <div className={"flex"}>
-        <Badge variant={"yellow"}>
-          <Loader2 size={12} className={"animate-spin"} />
-          Issuing certificate...
-        </Badge>
+      <div className={"flex"} data-status-cell>
+        {compact ? (
+          <span
+            className={"inline-flex items-center gap-1.5 text-yellow-400 truncate"}
+          >
+            <Loader2 size={11} className={"animate-spin shrink-0"} />
+            Issuing certificate...
+          </span>
+        ) : (
+          <Badge variant={"yellow"}>
+            <Loader2 size={12} className={"animate-spin"} />
+            Issuing certificate...
+          </Badge>
+        )}
       </div>
     );
   }
 
-  return <SettingUpService />;
+  return <SettingUpService compact={compact} />;
 }
 
-const SettingUpService = () => {
+const SettingUpService = ({ compact }: { compact?: boolean }) => {
   return (
-    <div className={"flex"}>
-      <Badge variant={"yellow"}>
-        <Loader2 size={14} className={"animate-spin"} />
-        Setting up service...
-      </Badge>
+    <div className={"flex"} data-status-cell>
+      {compact ? (
+        <span
+          className={"inline-flex items-center gap-1.5 text-yellow-400 truncate"}
+        >
+          <Loader2 size={11} className={"animate-spin shrink-0"} />
+          Setting up service...
+        </span>
+      ) : (
+        <Badge variant={"yellow"}>
+          <Loader2 size={14} className={"animate-spin"} />
+          Setting up service...
+        </Badge>
+      )}
     </div>
   );
 };

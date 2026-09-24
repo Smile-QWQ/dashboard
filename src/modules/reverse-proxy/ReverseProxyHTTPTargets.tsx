@@ -46,7 +46,7 @@ export default function ReverseProxyHTTPTargets({
 }: Readonly<Props>) {
   return (
     <div>
-      <Label>HTTP/S Targets</Label>
+      <Label>HTTPS Targets</Label>
       <HelpText>
         Add one or more devices running your service or resources to make it
         publicly accessible.
@@ -93,10 +93,7 @@ export default function ReverseProxyHTTPTargets({
                       />
                       <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="default-outline"
-                            className="!px-3"
-                          >
+                          <Button variant="default-outline" className="!px-3" data-testid="target-row-actions">
                             <MoreVertical size={16} className="shrink-0" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -105,6 +102,7 @@ export default function ReverseProxyHTTPTargets({
                           align="end"
                         >
                           <DropdownMenuItem
+                            data-testid="edit-target"
                             onClick={() => onEditTarget(index)}
                           >
                             <div className="flex gap-3 items-center">
@@ -113,14 +111,12 @@ export default function ReverseProxyHTTPTargets({
                             </div>
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            data-testid="remove-target"
                             variant={"danger"}
                             onClick={() => onRemoveTarget(index)}
                           >
                             <div className="flex gap-3 items-center">
-                              <MinusCircleIcon
-                                size={14}
-                                className="shrink-0"
-                              />
+                              <MinusCircleIcon size={14} className="shrink-0" />
                               Remove Target
                             </div>
                           </DropdownMenuItem>
@@ -139,6 +135,7 @@ export default function ReverseProxyHTTPTargets({
         variant="dotted"
         className={cn("w-full mt-1", targets?.length > 0 && "mt-1")}
         size="sm"
+        data-testid="add-target"
         onClick={onAddTarget}
         disabled={!!(initialNetwork && !initialNetwork.resources?.length)}
       >
@@ -151,10 +148,7 @@ export default function ReverseProxyHTTPTargets({
           variant="warning"
           className="mt-3"
           icon={
-            <AlertTriangle
-              size={14}
-              className="shrink-0 relative top-[3px]"
-            />
+            <AlertTriangle size={14} className="shrink-0 relative top-[3px]" />
           }
         >
           There are currently no resources in your network{" "}

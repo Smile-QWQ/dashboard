@@ -9,24 +9,24 @@ import { ArrowRightFromLineIcon, GlobeIcon, LockKeyhole } from "lucide-react";
 
 type Props = {
   reverseProxy?: ReverseProxy;
+  compact?: boolean;
 };
 
-export const ReverseProxyTypeCell = ({ reverseProxy }: Props) => {
+export const ReverseProxyTypeCell = ({ reverseProxy, compact }: Props) => {
   const serviceModeLabel = useMemo(() => {
-    if (!reverseProxy?.mode) return "HTTP/S";
+    if (!reverseProxy?.mode) return "HTTPS";
     const mode = SERVICE_MODES[reverseProxy.mode];
-    if (!mode) return "HTTP/S";
+    if (!mode) return "HTTPS";
     return trim(mode.label.replace("Service", ""));
   }, [reverseProxy]);
+
+  if (compact) {
+    return <span className={"truncate"}>{serviceModeLabel}</span>;
+  }
 
   return (
     <div className={"flex"}>
       <Badge variant={"gray"} className={"font-normal"}>
-        <ReverseProxyServiceIcon
-          reverseProxy={reverseProxy}
-          className={"text-nb-gray-200"}
-          size={11}
-        />
         {serviceModeLabel}
       </Badge>
     </div>

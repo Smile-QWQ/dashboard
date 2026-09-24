@@ -8,7 +8,7 @@ import React from "react";
 export const fancyToggleSwitchVariants = cva([], {
   variants: {
     variant: {
-      default: ["px-6 py-4 border rounded-md"],
+      default: ["px-5 py-4 border rounded-md"],
       blank: null,
     },
     state: {
@@ -43,8 +43,10 @@ interface Props extends FancyToggleSwitchVariants {
   label?: React.ReactNode;
   children?: React.ReactNode;
   disabled?: boolean;
-  dataCy?: string;
+  "data-testid"?: string;
   className?: string;
+  labelClassName?: string;
+  textWrapperClassName?: string;
 }
 
 export default function FancyToggleSwitch({
@@ -54,9 +56,11 @@ export default function FancyToggleSwitch({
   label,
   children,
   disabled = false,
-  dataCy,
+  "data-testid": dataTestId,
   className,
   variant = "default",
+  labelClassName,
+  textWrapperClassName = "max-w-sm",
 }: Readonly<Props>) {
   const handleToggle = () => {
     if (disabled) return;
@@ -87,15 +91,15 @@ export default function FancyToggleSwitch({
       )}
     >
       <div className={"flex justify-between gap-10"}>
-        <div className={"max-w-sm"}>
-          <Label>{label}</Label>
+        <div className={cn(textWrapperClassName)}>
+          <Label className={labelClassName}>{label}</Label>
           <HelpText margin={false}>{helpText}</HelpText>
         </div>
         <div className={"mt-2 pr-1"}>
           <ToggleSwitch
             checked={value}
             onCheckedChange={onChange}
-            dataCy={dataCy}
+            data-testid={dataTestId}
           />
         </div>
       </div>

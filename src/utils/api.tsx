@@ -16,7 +16,12 @@ type Method = "GET" | "POST" | "PUT" | "DELETE";
 export type ErrorResponse = {
   code: number;
   message: string;
+  requestId?: string;
 };
+
+// Header set by newer management API servers to correlate a response with a
+// server-side request. Absent on older servers.
+const REQUEST_ID_HEADER = "X-Request-Id";
 
 type RequestOptions = {
   key?: string;
@@ -51,10 +56,12 @@ async function apiRequest<T>(
     signal: options?.signal,
   });
 
+  const requestId = res.headers.get(REQUEST_ID_HEADER) || undefined;
+
   try {
     if (!res.ok) {
       const error = (await res.json()) as ErrorResponse;
-      return Promise.reject(error);
+      return Promise.reject({ ...error, requestId });
     }
     if (options?.blob) return (await res.blob()) as T;
     return (await res.json()) as T;
@@ -63,6 +70,7 @@ async function apiRequest<T>(
       const error = {
         code: res.status,
         message: res.statusText,
+        requestId,
       } as ErrorResponse;
       return Promise.reject(error);
     }
@@ -129,17 +137,19 @@ export default function useFetchApi<T>(
   const handleErrors = useApiErrorHandling(ignoreError);
   const { globalApiParams } = useApplicationContext();
 
-  const cacheKey = options?.key ? [url, options?.key] : url;
+  const cacheKey = !allowFetch
+    ? null
+    : options?.key
+    ? [url, options?.key]
+    : url;
   const fetchFn = options?.key
     ? async ([url]: [url: string]) => {
-        if (!allowFetch) return;
         return apiRequest<T>(fetch, "GET", url, undefined, {
           ...options,
           globalParams: globalApiParams,
         }).catch((err) => handleErrors(err as ErrorResponse));
       }
     : async (url: string) => {
-        if (!allowFetch) return;
         return apiRequest<T>(fetch, "GET", url, undefined, {
           ...options,
           globalParams: globalApiParams,
@@ -213,6 +223,16 @@ export function useApiCall<T>(
   };
 }
 
+// Which screen a blocked or unapproved user belongs on is an app-level routing
+// decision, and it is made in UserProfileProvider from the responses rather
+// than here. Acting on whichever refused call landed first got it wrong: only
+// /users/current can tell a pending user from a blocked one on current
+// management, and only it names the owner who can approve them.
+//
+// Nothing else in the app can load for such a user either way, so the calls
+// that ignore errors still surface theirs — ignoreError means "do not raise a
+// toast for this call", not "swallow the reason the dashboard is empty".
+
 export function useApiErrorHandling(ignoreError = false) {
   const { login } = useOidc();
   const currentPath = usePathname();
@@ -235,18 +255,14 @@ export function useApiErrorHandling(ignoreError = false) {
       setError(err);
     }
 
-    // Handle user blocked/pending approval responses
+    // UserProfileProvider renders the screen for a blocked or unapproved user,
+    // so these must not also raise the error boundary over the top of it. The
+    // wording is management's — resolveRefusedUser there reads the same
+    // messages to decide which of the two screens it is.
     if (
       err.code == 403 &&
-      (err.message?.toLowerCase().includes("blocked") ||
-        err.message?.toLowerCase().includes("pending"))
+      /pending approval|blocked/i.test(err.message ?? "")
     ) {
-      const params = new URLSearchParams({
-        code: err.code.toString(),
-        message: encodeURIComponent(err.message),
-        type: "user-status",
-      });
-      window.location.href = `/error?${params.toString()}`;
       return Promise.reject(err);
     }
 

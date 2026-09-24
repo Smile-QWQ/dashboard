@@ -13,16 +13,21 @@ import { RoutingPeerSetupKeyInfo } from "@/modules/setup-netbird-modal/SetupModa
 
 type Props = {
   setupKey?: string;
+  setupKeyContent?: React.ReactNode;
+  setupKeyPlaceholder?: string;
   showSetupKeyInfo?: boolean;
   hostname?: string;
 };
 
 export default function DockerTab({
   setupKey,
+  setupKeyContent,
+  setupKeyPlaceholder,
   showSetupKeyInfo = false,
   hostname,
 }: Readonly<Props>) {
   const grpcApiOrigin = getGrpcApiOrigin();
+  const offset = setupKeyContent ? 1 : 0;
   return (
     <TabsContent value={String(OperatingSystem.DOCKER)}>
       <TabsContentPadding>
@@ -46,19 +51,22 @@ export default function DockerTab({
               </Link>
             </div>
           </Steps.Step>
-          <Steps.Step step={2}>
+          {setupKeyContent && (
+            <Steps.Step step={2}>{setupKeyContent}</Steps.Step>
+          )}
+          <Steps.Step step={2 + offset}>
             <p>
               Run NetBird container
               {showSetupKeyInfo && <RoutingPeerSetupKeyInfo />}
             </p>
             <Code>
-              <Code.Line>docker run --rm -d \</Code.Line>
+              <Code.Line>docker run -d --restart=unless-stopped \</Code.Line>
               <Code.Line> --cap-add=NET_ADMIN \</Code.Line>
               <Code.Line>
                 {" "}
                 -e NB_SETUP_KEY=
                 <span className={"text-netbird"}>
-                  {setupKey ?? "SETUP_KEY"}
+                  {setupKey ?? setupKeyPlaceholder ?? "SETUP_KEY"}
                 </span>{" "}
                 \
               </Code.Line>
@@ -82,7 +90,7 @@ export default function DockerTab({
               <Code.Line> netbirdio/netbird:latest</Code.Line>
             </Code>
           </Steps.Step>
-          <Steps.Step step={3} line={false}>
+          <Steps.Step step={3 + offset} line={false}>
             <p>Read our documentation</p>
             <InlineLink
               href={"https://docs.netbird.io/how-to/installation/docker"}
